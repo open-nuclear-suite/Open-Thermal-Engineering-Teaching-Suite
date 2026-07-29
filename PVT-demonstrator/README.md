@@ -1,6 +1,6 @@
 # Native P-v-T AZEL Demonstrator
 
-Run `run_azel.ps1`.
+From the repository root, run `run_pvt_demonstrator.bat` in Command Prompt.
 
 This is the Tkinter/Matplotlib AZEL edition of the native P-v-T teaching
 application. Its 3D mouse interaction is fixed to elevation/azimuth rotation,
@@ -21,5 +21,5 @@ The demonstrator includes:
 The previously delivered native source is preserved unchanged as
 `pvt_native_backup.py`.
 
-On first use, install the packages listed in `requirements_azel.txt`. The
-included `Install and run.docx` provides Windows setup instructions.
+On first use, run `setup_windows.bat` from the repository root. The included
+`Install and run.docx` provides additional Windows setup instructions.

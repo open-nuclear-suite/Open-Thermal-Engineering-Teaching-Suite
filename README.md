@@ -1,46 +1,104 @@
 # Open Thermal Engineering Teaching Suite
 
-An open collection of interactive desktop applications for teaching thermal
-engineering concepts.
+A pair of interactive Windows desktop applications for teaching thermodynamic
+properties and boiler-furnace operation.
 
-## Applications
+> **Teaching software only.** These applications are intended for conceptual
+> exploration and classroom demonstration. They are not suitable for equipment
+> design, safety analysis, certification, operator training, or plant operation.
 
-### P-v-T Demonstrator
+## Included applications
 
-An interactive Tkinter and Matplotlib application for exploring pressure,
-specific-volume, and temperature relationships for five working fluids.
+| Application | Topics | Entry point |
+| --- | --- | --- |
+| P-v-T Demonstrator | Pressure-volume-temperature surfaces, saturation boundaries, isotherms, and working-fluid comparison | `PVT-demonstrator\pvt_native_azel.py` |
+| Boiler Furnace Simulator | Combustion, furnace response, heat transfer, and flue-gas behaviour | `boiler_furnace_simulator\boiler_furnace_simulator.py` |
 
-```powershell
-.\PVT-demonstrator\run_azel.ps1
+## Windows requirements
+
+- Windows 10 or Windows 11
+- Python 3.10 or newer from [python.org](https://www.python.org/downloads/windows/)
+- A local Windows desktop session capable of opening GUI windows
+
+During Python installation, select **Add python.exe to PATH** and keep the
+optional Tcl/Tk component enabled.
+
+## Installation
+
+Open **Command Prompt** (`cmd.exe`), then clone the repository:
+
+```cmd
+git clone https://github.com/open-nuclear-suite/Open-Thermal-Engineering-Teaching-Suite.git
+cd Open-Thermal-Engineering-Teaching-Suite
 ```
 
-### Boiler Furnace Simulator
+Run the Windows setup helper:
 
-An interactive PyQt5 furnace simulator with combustion, heat-transfer, and
-flue-gas visualizations.
-
-```powershell
-py -m pip install -r .\boiler_furnace_simulator\requirements.txt
-py .\boiler_furnace_simulator\boiler_furnace_simulator.py
+```cmd
+setup_windows.bat
 ```
 
-## Requirements
+This creates a local `.venv` environment and installs all required packages.
 
-- Windows, Linux, or macOS
-- Python 3.10 or newer
-- Tk support for the P-v-T Demonstrator
+## Running the applications
 
-Each application keeps its own dependencies and launch instructions in its
-subdirectory.
+From Command Prompt, or by double-clicking the corresponding file:
 
-## Quick start
-
-On Windows, run the suite launcher:
-
-```powershell
-.\launch_suite.ps1
+```cmd
+run_pvt_demonstrator.bat
 ```
 
-Choose the application from the menu. The launcher installs that application's
-Python dependencies before starting it.
+```cmd
+run_boiler_furnace_simulator.bat
+```
 
+## Repository layout
+
+```text
+.
+|-- PVT-demonstrator/
+|-- boiler_furnace_simulator/
+|-- AUTHORS.md
+|-- CITATION.cff
+|-- LICENSE
+|-- README.md
+|-- requirements.txt
+|-- run_boiler_furnace_simulator.bat
+|-- run_pvt_demonstrator.bat
+`-- setup_windows.bat
+```
+
+## Troubleshooting
+
+- **`'py' is not recognized`**: install Python from python.org and select
+  **Add python.exe to PATH**, then reopen Command Prompt.
+- **`ModuleNotFoundError`**: rerun `setup_windows.bat`.
+- **`No module named tkinter`**: modify or reinstall Python and enable the
+  **tcl/tk and IDLE** optional feature.
+- **No window appears**: use a local desktop session rather than a headless
+  service or notebook.
+- **A launcher closes immediately**: run it from Command Prompt so the error
+  remains visible.
+
+## Author and contact
+
+**Mohsin Mohd Sies**
+
+- Nuclear Engineering Program
+- Faculty of Chemical and Energy Engineering
+- Universiti Teknologi Malaysia
+- Email: [mohsin.sies@gmail.com](mailto:mohsin.sies@gmail.com)
+- GitHub: [open-nuclear-suite](https://github.com/open-nuclear-suite)
+
+For academic collaboration, teaching feedback, or questions about the
+applications, please contact the author.
+
+## Citation
+
+If you use this software in teaching, research, or published work, please cite
+it using the metadata in [CITATION.cff](CITATION.cff).
+
+## License
+
+Copyright (c) 2026 Mohsin Mohd Sies. This project is distributed under the
+[MIT License](LICENSE).

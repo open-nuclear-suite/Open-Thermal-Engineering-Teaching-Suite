@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "Open Thermal Engineering Teaching Suite"
+type: software
+authors:
+  - family-names: "Sies"
+    given-names: "Mohsin Mohd"
+    affiliation: "Nuclear Engineering Program, Faculty of Chemical and Energy Engineering, Universiti Teknologi Malaysia"
+    email: "mohsin.sies@gmail.com"
+repository-code: "https://github.com/open-nuclear-suite/Open-Thermal-Engineering-Teaching-Suite"
+license: MIT
+abstract: >-
+  Interactive Windows desktop applications for teaching thermodynamic
+  properties and boiler-furnace operation.
+keywords:
+  - thermal engineering education
+  - thermodynamics
+  - P-v-T properties
+  - boiler furnace
+  - combustion
+

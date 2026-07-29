@@ -5,8 +5,9 @@ combustion, heat transfer, and flue-gas behaviour.
 
 ## Run
 
-```powershell
-py -m pip install -r .\requirements.txt
-py .\boiler_furnace_simulator.py
-```
+From the repository root in Command Prompt:
 
+```cmd
+setup_windows.bat
+run_boiler_furnace_simulator.bat
+```
