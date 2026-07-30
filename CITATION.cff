@@ -11,11 +11,13 @@ repository-code: "https://github.com/open-nuclear-suite/Open-Thermal-Engineering
 license: MIT
 abstract: >-
   Interactive Windows desktop applications for teaching thermodynamic
-  properties and boiler-furnace operation.
+  properties and boiler-furnace operation. Thermophysical property calculations
+  in the P-v-T Demonstrator use CoolProp. Simplified water-and-steam property
+  approximations in the boiler-furnace simulator are informed by IAPWS-IF97
+  but do not constitute a complete or standards-conforming implementation.
 keywords:
   - thermal engineering education
   - thermodynamics
   - P-v-T properties
   - boiler furnace
   - combustion
-

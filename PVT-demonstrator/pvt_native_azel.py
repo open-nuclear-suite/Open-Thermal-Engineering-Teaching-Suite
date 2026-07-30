@@ -1,6 +1,9 @@
 """Native, browser-free P-v-T teaching application.
 
 Requires: numpy, matplotlib, CoolProp
+
+Thermophysical properties are calculated using CoolProp:
+Bell et al. (2014), https://doi.org/10.1021/ie4033999
 Run: python pvt_native_app.py
 """
 from __future__ import annotations

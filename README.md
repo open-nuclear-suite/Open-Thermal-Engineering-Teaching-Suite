@@ -98,6 +98,27 @@ applications, please contact the author.
 If you use this software in teaching, research, or published work, please cite
 it using the metadata in [CITATION.cff](CITATION.cff).
 
+## Scientific software and formulation attribution
+
+The P-v-T Demonstrator uses
+[CoolProp](https://coolprop.org/) for thermophysical property calculations:
+
+> Bell, I. H., Wronski, J., Quoilin, S., & Lemort, V. (2014). Pure and
+> pseudo-pure fluid thermophysical property evaluation and the open-source
+> thermophysical property library CoolProp. *Industrial & Engineering Chemistry
+> Research, 53*(6), 2498–2508.
+> [https://doi.org/10.1021/ie4033999](https://doi.org/10.1021/ie4033999)
+
+The boiler-furnace simulator's water-and-steam property approximations are
+informed by the
+[IAPWS Industrial Formulation 1997](https://www.iapws.org/relguide/IF97-Rev.pdf)
+(IAPWS-IF97), published by the International Association for the Properties of
+Water and Steam. The simulator uses simplified educational approximations; it
+is not a complete, validated, or standards-conforming implementation of
+IAPWS-IF97.
+
+See [scientific attributions](ATTRIBUTIONS.md) for further details.
+
 ## License
 
 Copyright (c) 2026 Mohsin Mohd Sies. This project is distributed under the

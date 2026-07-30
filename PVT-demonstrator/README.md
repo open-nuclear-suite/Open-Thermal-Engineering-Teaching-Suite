@@ -18,6 +18,15 @@ The demonstrator includes:
 - camera preservation during slider updates;
 - the UTM logo and attribution footer.
 
+Thermophysical properties are calculated with
+[CoolProp](https://coolprop.org/). Academic users should cite:
+
+Bell, I. H., Wronski, J., Quoilin, S., & Lemort, V. (2014). Pure and
+pseudo-pure fluid thermophysical property evaluation and the open-source
+thermophysical property library CoolProp. *Industrial & Engineering Chemistry
+Research, 53*(6), 2498–2508.
+[https://doi.org/10.1021/ie4033999](https://doi.org/10.1021/ie4033999)
+
 The previously delivered native source is preserved unchanged as
 `pvt_native_backup.py`.
 

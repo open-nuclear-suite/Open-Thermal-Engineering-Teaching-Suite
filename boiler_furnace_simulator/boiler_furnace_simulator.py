@@ -2,6 +2,10 @@ import sys
 import csv
 import math
 from pathlib import Path
+
+# Water/steam property helpers in this teaching simulator are simplified
+# approximations informed by IAPWS-IF97. They are not a complete, validated,
+# or standards-conforming implementation of IAPWS-IF97.
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (
