@@ -16,7 +16,8 @@ The demonstrator includes:
 - translucent pressure and temperature slicing planes;
 - balanced 3D box proportions;
 - camera preservation during slider updates;
-- the UTM logo and attribution footer.
+- FKM and HiREF branding, a three-second splash screen, and an attribution
+  footer.
 
 Thermophysical properties are calculated with
 [CoolProp](https://coolprop.org/). Academic users should cite:

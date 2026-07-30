@@ -23,7 +23,70 @@ from PIL import Image, ImageTk
 
 
 ISOTHERM_COLOR = "#174EA6"
+ASSET_DIR = Path(__file__).resolve().parent.parent
+FKM_LOGO_PATH = ASSET_DIR / "utm.fkm.logo.png"
+HIREF_LOGO_PATH = ASSET_DIR / "hiref.logo.png"
 mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
+
+
+def logo_image(path, max_size):
+    """Load a logo at an aspect-preserving size for a Tk widget."""
+    if not path.is_file():
+        return None
+    image = Image.open(path).convert("RGBA")
+    image.thumbnail(max_size, Image.Resampling.LANCZOS)
+    return ImageTk.PhotoImage(image)
+
+
+class StartupSplash(tk.Tk):
+    """Borderless FKM/HiREF startup panel shown for three seconds."""
+
+    def __init__(self):
+        super().__init__()
+        self.overrideredirect(True)
+        self.configure(background="#15181d", highlightbackground="#7d1238",
+                       highlightthickness=3)
+        self.attributes("-topmost", True)
+
+        panel = tk.Frame(self, background="#15181d", padx=36, pady=28)
+        panel.pack()
+
+        self.fkm_image = logo_image(FKM_LOGO_PATH, (850, 140))
+        if self.fkm_image:
+            tk.Label(panel, image=self.fkm_image, background="#15181d").pack()
+        else:
+            tk.Label(
+                panel, text="UTM Faculty of Mechanical Engineering",
+                background="#7d1238", foreground="white",
+                font=("", 24, "bold"), padx=10, pady=10,
+            ).pack(fill="x")
+
+        self.hiref_image = logo_image(HIREF_LOGO_PATH, (250, 155))
+        if self.hiref_image:
+            tk.Label(
+                panel, image=self.hiref_image, background="#15181d"
+            ).pack(pady=(10, 8))
+        else:
+            tk.Label(
+                panel, text="HiREF", background="#15181d",
+                foreground="white", font=("", 22, "bold"),
+            ).pack(pady=(10, 8))
+
+        tk.Label(
+            panel, text="P-v-T Surface Slicing Demonstrator",
+            background="#15181d", foreground="#f3f5f7",
+            font=("", 21, "bold"),
+        ).pack(pady=(2, 0))
+        tk.Label(
+            panel, text="Mohsin Mohd Sies, HiREF, UTM - 2026",
+            background="#15181d", foreground="#c7d1db", font=("", 10),
+        ).pack(pady=(5, 0))
+
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - self.winfo_width()) // 2
+        y = (self.winfo_screenheight() - self.winfo_height()) // 2
+        self.geometry(f"+{x}+{y}")
+        self.after(3000, self.destroy)
 
 
 @dataclass(frozen=True)
@@ -137,18 +200,49 @@ class App(tk.Tk):
             font=("", 9),
         ).pack(side="bottom", fill="x")
 
-        left = ttk.Frame(self, padding=10)
-        left.pack(side="left", fill="y")
-        right = ttk.Frame(self)
-        right.pack(side="right", expand=True, fill="both")
+        header = tk.Frame(
+            self, background="#0e1013",
+            highlightbackground="#7d1238", highlightthickness=0,
+        )
+        header.pack(side="top", fill="x")
+        header.configure(padx=14, pady=8)
 
-        logo_path = Path(__file__).with_name("utm_logo.png")
-        self.logo_image = None
-        if logo_path.is_file():
-            logo = Image.open(logo_path).convert("RGBA")
-            logo.thumbnail((285, 95), Image.Resampling.LANCZOS)
-            self.logo_image = ImageTk.PhotoImage(logo)
-            ttk.Label(left, image=self.logo_image).pack(anchor="center", pady=(0, 10))
+        self.fkm_logo_image = logo_image(FKM_LOGO_PATH, (560, 70))
+        self.hiref_logo_image = logo_image(HIREF_LOGO_PATH, (110, 70))
+        if self.fkm_logo_image:
+            tk.Label(
+                header, image=self.fkm_logo_image, background="#0e1013"
+            ).pack(side="left")
+        else:
+            tk.Label(
+                header, text="UTM Faculty of Mechanical Engineering",
+                background="#7d1238", foreground="white",
+                font=("", 16, "bold"), padx=20, pady=8,
+            ).pack(side="left")
+        if self.hiref_logo_image:
+            tk.Label(
+                header, image=self.hiref_logo_image, background="#0e1013"
+            ).pack(side="left", padx=(10, 0))
+        else:
+            tk.Label(
+                header, text="HiREF", background="#0e1013",
+                foreground="white", font=("", 16, "bold"),
+            ).pack(side="left", padx=(10, 0))
+        tk.Label(
+            header, text="P-v-T Surface Slicing Demonstrator",
+            background="#0e1013", foreground="#f3f5f7",
+            font=("", 18, "bold"), anchor="e",
+        ).pack(side="right", expand=True, fill="x")
+        tk.Frame(self, background="#7d1238", height=3).pack(
+            side="top", fill="x"
+        )
+
+        content = ttk.Frame(self)
+        content.pack(expand=True, fill="both")
+        left = ttk.Frame(content, padding=10)
+        left.pack(side="left", fill="y")
+        right = ttk.Frame(content)
+        right.pack(side="right", expand=True, fill="both")
 
         ttk.Label(left, text="Controls", font=("", 13, "bold")).pack(anchor="w")
         ttk.Label(left, text="Fluid").pack(anchor="w", pady=(12, 2))
@@ -342,4 +436,5 @@ class App(tk.Tk):
 
 
 if __name__ == "__main__":
+    StartupSplash().mainloop()
     App().mainloop()
