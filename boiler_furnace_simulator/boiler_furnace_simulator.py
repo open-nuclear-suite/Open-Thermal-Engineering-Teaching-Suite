@@ -20,14 +20,16 @@ from matplotlib.figure import Figure
 
 PROJECT_NAME = 'Live Boiler/Furnace Transient Simulator'
 AUTHOR_LINE = 'Mohsin Mohd Sies, HiREF, UTM - 2026'
-LOGO_PATH = Path(__file__).resolve().parent / 'UTM.logo.png'
+ASSET_DIR = Path(__file__).resolve().parent.parent
+FKM_LOGO_PATH = ASSET_DIR / 'utm.fkm.logo.png'
+HIREF_LOGO_PATH = ASSET_DIR / 'hiref.logo.png'
 
 
-def logo_pixmap(max_width, max_height):
-    """Load the bundled UTM logo without cropping or changing its aspect ratio."""
-    if not LOGO_PATH.is_file():
+def logo_pixmap(path, max_width, max_height):
+    """Load a logo without cropping or changing its aspect ratio."""
+    if not path.is_file():
         return QPixmap()
-    image = QPixmap(str(LOGO_PATH))
+    image = QPixmap(str(path))
     if image.isNull():
         return image
     return image.scaled(
@@ -50,18 +52,30 @@ class StartupSplash(QDialog):
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(10)
 
-        logo = QLabel()
-        logo.setAlignment(Qt.AlignCenter)
-        pixmap = logo_pixmap(720, 245)
-        if pixmap.isNull():
-            logo.setText('UTM')
-            logo.setStyleSheet(
+        fkm_logo = QLabel()
+        fkm_logo.setAlignment(Qt.AlignCenter)
+        fkm_pixmap = logo_pixmap(FKM_LOGO_PATH, 850, 140)
+        if fkm_pixmap.isNull():
+            fkm_logo.setText('UTM Faculty of Mechanical Engineering')
+            fkm_logo.setStyleSheet(
                 'background:#7d1238; color:white; padding:10px;'
-                'font-size:34px; font-weight:bold;'
+                'font-size:24px; font-weight:bold;'
             )
         else:
-            logo.setPixmap(pixmap)
-        layout.addWidget(logo)
+            fkm_logo.setPixmap(fkm_pixmap)
+        layout.addWidget(fkm_logo)
+
+        hiref_logo = QLabel()
+        hiref_logo.setAlignment(Qt.AlignCenter)
+        hiref_pixmap = logo_pixmap(HIREF_LOGO_PATH, 250, 155)
+        if hiref_pixmap.isNull():
+            hiref_logo.setText('HiREF')
+            hiref_logo.setStyleSheet(
+                'color:#f3f5f7; font-size:22px; font-weight:bold;'
+            )
+        else:
+            hiref_logo.setPixmap(hiref_pixmap)
+        layout.addWidget(hiref_logo)
 
         title = QLabel(PROJECT_NAME)
         title.setAlignment(Qt.AlignCenter)
@@ -164,14 +178,16 @@ def IF97_region_pT(pMPa, TK):
     return 'Region5'
 
 
-def pi_ctrl(uold, pv, sp, kp, ki, inte, dt, umin, umax):
+def pi_ctrl(uold, pv, sp, kp, ki, previous_error, dt, umin, umax):
+    """Velocity-form PI controller with simple saturation anti-windup."""
     e = sp - pv
-    inte += e * dt
-    u = uold + kp * e + ki * inte
-    u = clamp(u, umin, umax)
-    if u == umin or u == umax:
-        inte -= 0.3 * e * dt
-    return u, inte
+    proportional_step = kp * (e - previous_error)
+    integral_step = ki * e * dt
+    candidate = uold + proportional_step + integral_step
+    if (candidate > umax and e > 0) or (candidate < umin and e < 0):
+        # Do not integrate farther into saturation.
+        candidate = uold + proportional_step
+    return clamp(candidate, umin, umax), e
 
 
 def fuel_catalog():
@@ -278,6 +294,7 @@ def plant_calc_if97(p, state, phase, dens_on):
 
     # Post-furnace leakage: adds air to the sample path/duct after combustion.
     dry_before_leak = max(CO2 + CO + O2out + N2in + SO2, 1e-12)
+    combustion_dry_o2 = 100 * O2out / dry_before_leak
     leak_air = dry_before_leak * max(p.get('flue_air_leak', 0.0), 0.0) / 100.0
     O2_sample = O2out + 0.21 * leak_air
     N2_sample = N2in + 0.79 * leak_air
@@ -301,6 +318,66 @@ def plant_calc_if97(p, state, phase, dens_on):
     eta = 100 * qboiler / max(nf * p['lhv'], 1e-12)
     tstack = max(85, 140 + 3.1 * max(p['ea'], 0) + 45 * (1 - effective_capture) + 120 * p['loss'] / 100 + 1.7 * fouling)
 
+    # Teaching-level NOx estimate. This is a transparent trend model, not a
+    # regulatory emissions calculation. Thermal NOx rises exponentially with a
+    # flame-temperature proxy and available oxygen; fuel NOx scales with the
+    # user-entered fuel nitrogen; prompt NOx represents a small hydrocarbon-rich
+    # flame-front contribution. Downstream leakage dilutes measured ppm.
+    flame_temp = clamp(
+        1950
+        + 0.35 * (p['tair'] - 25)
+        + 0.15 * (p['tfuel'] - 25)
+        - 2.2 * max(p['ea'], 0)
+        - 260 * (1 - ce)
+        - 160 * max(p.get('fuelmoist', 0.0), 0.0),
+        900,
+        2150,
+    )
+    # Use furnace-exit O2 for formation chemistry. Air entering downstream may
+    # dilute the analyzer sample, but it cannot create additional thermal NOx.
+    oxygen_factor = math.sqrt(max(combustion_dry_o2, 0.2) / 3.0)
+    load_factor = clamp(p.get('demand', 1.0), 0.4, 1.35) ** 0.35
+    thermal_nox = clamp(
+        35
+        * math.exp((flame_temp - 1700) / 220)
+        * oxygen_factor
+        * load_factor
+        * (0.85 + 0.15 * mixing_quality),
+        0,
+        1500,
+    )
+    fuel_nox = 180 * max(p.get('fuel_nitrogen', 0.0), 0.0)
+    prompt_nox = (
+        12
+        * clamp(p.get('C', 0.0), 0.0, 3.0)
+        * (1.0 + 0.8 * (1.0 - mixing_quality))
+    )
+    nox_dilution = dry_before_leak / max(dry, 1e-12)
+    nox_ppm = (thermal_nox + fuel_nox + prompt_nox) * nox_dilution
+    nox_corrected_3pct = nox_ppm * (20.9 - 3.0) / max(20.9 - dry_O2, 1.0)
+
+    # Teaching-level unburned-hydrocarbon estimate, reported as ppmC. The
+    # estimate responds to incomplete/rich combustion, poor mixing, low flame
+    # temperature, and the greater burnout challenge of liquid/solid fuels.
+    richness = max(0.0, 1.05 - lambda_)
+    quench_factor = clamp((1450 - flame_temp) / 450, 0.0, 1.0)
+    phase_factor = {
+        'gas': 1.0,
+        'mixgas': 1.0,
+        'liquid': 1.35,
+        'mixliquid': 1.35,
+        'solid': 1.75,
+        'custom': 1.2,
+    }.get(p.get('fuel_phase', 'gas'), 1.0)
+    uhc_ppmc = phase_factor * (
+        15
+        + 8000 * co_carbon_frac ** 1.2
+        + 12000 * richness ** 1.5
+        + 2500 * (1.0 - mixing_quality) ** 1.4
+        + 1200 * quench_factor
+    ) * nox_dilution
+    uhc_ppmc = clamp(uhc_ppmc, 0, 50000)
+
     P = p['pbar'] * 0.1
     Tsat = IF97_Tsat_p(P) - 273.15
     hf = IF97_hL_p(P)
@@ -310,7 +387,15 @@ def plant_calc_if97(p, state, phase, dens_on):
     hsh_sp = IF97_h_pT(P, max(p['tsteam_sp'], Tsat + 5) + 273.15)
     rho_steam = max(0.5, 1 / IF97_v_pT(P, max(p['tsteam_sp'], Tsat + 5) + 273.15))
     rho_fw = max(50, 1 / IF97_v_pT(P, min(p['tfw'], Tsat - 2) + 273.15))
-    msteam_target = max(0.5, p['demand'] * qboiler / max(hsh_sp - hfw, 300))
+    steam_capacity = max(0.0, qboiler / max(hsh_sp - hfw, 300))
+    if p.get('coordinated_firing', False):
+        # Firing has already followed load demand, so generated steam is the
+        # energy-supported capacity rather than demand-scaled a second time.
+        msteam_target = steam_capacity
+    else:
+        # Manual/uncoordinated firing retains the training mismatch: steam
+        # demand may differ from the heat being released by the furnace.
+        msteam_target = max(0.0, p['demand'] * steam_capacity)
     qsteam_need = msteam_target * max(hsh_sp - hfw, 0)
     qeconom = 0.18 * qboiler
     qevap = 0.60 * qboiler
@@ -330,13 +415,39 @@ def plant_calc_if97(p, state, phase, dens_on):
     steam_noise = p['steam_ft_noise'] / 100 * msteam_actual * math.sin(1.7 * phase)
     fw_noise = p['fw_ft_noise'] / 100 * mfw_actual * math.cos(1.3 * phase)
     if dens_on == 1:
-        msteam_comp = max(0, math.sqrt(max(steam_dp, 0)) * math.sqrt(max(rho_steam, 0.1)) * 14 + steam_noise)
-        mfw_comp_meas = max(0, math.sqrt(max(fw_dp, 0)) * math.sqrt(max(rho_fw, 1)) * 4.5 + fw_noise)
+        # Invert the DP-generation relationships above so a healthy,
+        # density-compensated transmitter reports the actual mass flow.
+        msteam_comp = max(
+            0,
+            20
+            * math.sqrt(
+                max(steam_dp, 0)
+                * 5
+                / max(p['steam_dp'] * rho_steam, 1e-12)
+            )
+            + steam_noise,
+        )
+        mfw_comp_meas = max(
+            0,
+            20
+            * math.sqrt(
+                max(fw_dp, 0)
+                * 1000
+                / max(p['fw_dp'] * rho_fw, 1e-12)
+            )
+            + fw_noise,
+        )
     else:
-        msteam_comp = max(0, math.sqrt(max(steam_dp, 0)) * 14 + steam_noise)
-        mfw_comp_meas = max(0, math.sqrt(max(fw_dp, 0)) * 4.5 + fw_noise)
+        msteam_comp = max(
+            0, 20 * math.sqrt(max(steam_dp, 0) / max(p['steam_dp'], 1e-12))
+            + steam_noise
+        )
+        mfw_comp_meas = max(
+            0, 20 * math.sqrt(max(fw_dp, 0) / max(p['fw_dp'], 1e-12))
+            + fw_noise
+        )
     reg = IF97_region_pT(P, max(p['tsteam_sp'], Tsat + 5) + 273.15)
-    return dict(o2=dry_O2, eta=eta, qboiler=qboiler, qsteam=qsteam_need, adequacy=adequacy, tstack=tstack, Tsat=Tsat, hf=hf, hg=hg, rho_steam=rho_steam, rho_fw=rho_fw, tmid=tmid, tsteam=tout, msteam_actual=msteam_actual, mfw_actual=mfw_actual, msteam_comp=msteam_comp, mfw_comp_meas=mfw_comp_meas, region=reg, stoair=nu_O2_st * 4.76 * nf, actair=O2in + N2in, dry_O2=dry_O2, dry_CO2=dry_CO2, dry_CO=dry_CO, co_ppm=co_ppm, lambda_=lambda_, phi=phi, ce=ce, flue_total=flue_total, water_mole_fraction=water_mole_fraction, dew_point=dew_point, co_carbon_frac=co_carbon_frac, effective_capture=effective_capture, flue_air_leak=leak_air)
+    return dict(o2=dry_O2, eta=eta, qboiler=qboiler, qsteam=qsteam_need, adequacy=adequacy, tstack=tstack, Tsat=Tsat, hf=hf, hg=hg, rho_steam=rho_steam, rho_fw=rho_fw, tmid=tmid, tsteam=tout, steam_capacity=steam_capacity, msteam_actual=msteam_actual, mfw_actual=mfw_actual, msteam_comp=msteam_comp, mfw_comp_meas=mfw_comp_meas, region=reg, stoair=nu_O2_st * 4.76 * nf, actair=O2in + N2in, dry_O2=dry_O2, dry_CO2=dry_CO2, dry_CO=dry_CO, co_ppm=co_ppm, uhc_ppmc=uhc_ppmc, lambda_=lambda_, phi=phi, ce=ce, flue_total=flue_total, water_mole_fraction=water_mole_fraction, dew_point=dew_point, flame_temp=flame_temp, thermal_nox=thermal_nox * nox_dilution, fuel_nox=fuel_nox * nox_dilution, prompt_nox=prompt_nox * nox_dilution, nox_ppm=nox_ppm, nox_corrected_3pct=nox_corrected_3pct, co_carbon_frac=co_carbon_frac, effective_capture=effective_capture, flue_air_leak=leak_air)
 
 def select_mode(sel, model, p):
     if sel == 1:
@@ -392,6 +503,12 @@ def alarms_and_trip(s, p):
     if s.get('dew_margin', math.inf) <= p.get('dew_margin_alarm', 15.0):
         ac = 4
         alarm_txt = 'Dew-point margin LOW'
+    if s.get('fg_nox_ppm', 0.0) >= p.get('nox_alarm', 300.0):
+        ac = 5
+        alarm_txt = 'NOx emissions HIGH'
+    if s.get('fg_uhc_ppmc', 0.0) >= p.get('uhc_alarm', 500.0):
+        ac = 6
+        alarm_txt = 'Unburned hydrocarbons HIGH'
     if s['tsteam'] >= p['ttrip'] or s['drum'] <= max(5, p['lvl_ll'] - 10) or s['drum'] >= min(95, p['lvl_hh'] + 10):
         tc = 1
         trip_txt = 'MASTER FUEL TRIP'
@@ -501,9 +618,12 @@ class BoilerApp(QMainWindow):
         self.fuels = [f['name'] for f in self.fuel_db]
         self.mix = default_mixture()
         self.mixl = default_liquid_blend()
-        self.mem = dict(int_o2=0, int_ot=0, int_it=0, int_lvl=0, int_fic=0, phase=0)
-        self.state = dict(o2=3, eta=80, qboiler=0, qsteam=0, adequacy=100, tstack=180, dew_point=55, dew_margin=125, tmid=450, tsteam=440, instab=0, drum=50, steamflow=20, fwflow=20, spray=0, trip=0, alarm=0, fwvalve=20, sim_time=0, realtime=0, fuel_user_flow=100, fuel_nmolps=1, fuel_unit='Nm3/hr', fg_o2=3, fg_co2=9, fg_co_ppm=300, fg_stack=180)
-        self.hist = {k: [math.nan] * self.hist_n for k in ['eta', 'ad', 'drum', 'steam', 'fw', 'tsteam', 'tstack', 'air', 'spray', 'inst', 'fwsp', 'mode', 'fg_o2', 'fg_co2', 'fg_co_ppm']}
+        self.mem = dict(
+            int_o2=0, int_ot=0, int_it=0, int_lvl=0, int_fic=0,
+            lvltrim=0, mid_sp=440, phase=0,
+        )
+        self.state = dict(o2=3, eta=80, qboiler=0, qsteam=0, adequacy=100, tstack=180, dew_point=55, dew_margin=125, flame_temp=1900, nox_corrected_3pct=120, steam_capacity=0.30, fuel_balance_pct=100, fuel_warning=False, fuel_warn_time=0, firing_factor=1.0, actual_fuel_user_flow=100, tmid=450, tsteam=440, instab=0, drum=50, drum_inventory=50, swell=0, previous_steamflow=0.30, steamflow=0.30, fwflow=0.30, spray=0, trip=0, alarm=0, fwvalve=0.30, sim_time=0, realtime=0, fuel_user_flow=100, fuel_nmolps=1, fuel_unit='Nm3/hr', fg_o2=3, fg_co2=9, fg_co_ppm=300, fg_nox_ppm=120, fg_uhc_ppmc=30, fg_stack=180)
+        self.hist = {k: [math.nan] * self.hist_n for k in ['eta', 'ad', 'drum', 'steam', 'fw', 'tsteam', 'tstack', 'air', 'spray', 'inst', 'fwsp', 'mode', 'fg_o2', 'fg_co2', 'fg_co_ppm', 'fg_nox_ppm', 'fg_uhc_ppmc']}
         self.rows = {}
         self.out = {}
         self.conv = {}
@@ -529,18 +649,34 @@ class BoilerApp(QMainWindow):
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(14, 8, 14, 8)
 
-        self.utm_logo = QLabel()
-        self.utm_logo.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        dashboard_logo = logo_pixmap(320, 108)
-        if dashboard_logo.isNull():
-            self.utm_logo.setText('UTM')
-            self.utm_logo.setStyleSheet(
+        logo_group = QHBoxLayout()
+        logo_group.setSpacing(10)
+
+        self.fkm_logo = QLabel()
+        self.fkm_logo.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        dashboard_fkm_logo = logo_pixmap(FKM_LOGO_PATH, 560, 70)
+        if dashboard_fkm_logo.isNull():
+            self.fkm_logo.setText('UTM Faculty of Mechanical Engineering')
+            self.fkm_logo.setStyleSheet(
                 'background:#7d1238; color:white; padding:8px 20px;'
-                'font-size:24px; font-weight:bold;'
+                'font-size:16px; font-weight:bold;'
             )
         else:
-            self.utm_logo.setPixmap(dashboard_logo)
-        header_layout.addWidget(self.utm_logo, 0)
+            self.fkm_logo.setPixmap(dashboard_fkm_logo)
+        logo_group.addWidget(self.fkm_logo)
+
+        self.hiref_logo = QLabel()
+        self.hiref_logo.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        dashboard_hiref_logo = logo_pixmap(HIREF_LOGO_PATH, 110, 70)
+        if dashboard_hiref_logo.isNull():
+            self.hiref_logo.setText('HiREF')
+            self.hiref_logo.setStyleSheet(
+                'color:#f3f5f7; font-size:16px; font-weight:bold;'
+            )
+        else:
+            self.hiref_logo.setPixmap(dashboard_hiref_logo)
+        logo_group.addWidget(self.hiref_logo)
+        header_layout.addLayout(logo_group, 0)
 
         branding = QVBoxLayout()
         title = QLabel(PROJECT_NAME)
@@ -632,15 +768,15 @@ class BoilerApp(QMainWindow):
         self.fuel_info.setWordWrap(True)
         for w in [self.fuel_popup, self.lock_comp, gas_btn, liq_btn, self.fuel_info]:
             self.combustion_box.layout().addWidget(w)
-        for spec in [('Fuel flow','fuel_flow_user',1,50000,100,0.01),('Excess air base (%)','ea',0,150,15,0.01),('Air temp (C)','tair',0,350,25,0.01),('Fuel temp (C)','tfuel',0,200,25,0.01),('Combustion completeness','eta_comb',0.80,1.0,0.99,0.005),('Wall loss (%)','loss',0,15,3,0.01),('Heat capture factor','capture',0.40,0.95,0.82,0.01),('Mixture LHV','lhv',50,50000,802,0.01),('C atoms/mol fuel','C',0,20,1,0.01),('H atoms/mol fuel','H',0,40,4,0.01),('O atoms/mol fuel','O',0,12,0,0.01),('S atoms/mol fuel','S',0,2,0,0.01),('Fuel MW (kg/kmol)','mwfuel',2,250,16.043,0.01),('Fuel moisture frac','fuelmoist',0,0.40,0,0.01),('Fuel ash frac','fuelash',0,0.50,0,0.01)]:
+        for spec in [('Fuel flow','fuel_flow_user',1,50000,100,0.01),('Excess air base (%)','ea',0,150,15,0.01),('Air temp (C)','tair',0,350,25,0.01),('Fuel temp (C)','tfuel',0,200,25,0.01),('Combustion completeness','eta_comb',0.80,1.0,0.99,0.005),('Wall loss (%)','loss',0,15,3,0.01),('Heat capture factor','capture',0.40,0.95,0.82,0.01),('Mixture LHV','lhv',50,50000,802,0.01),('C atoms/mol fuel','C',0,20,1,0.01),('H atoms/mol fuel','H',0,40,4,0.01),('O atoms/mol fuel','O',0,12,0,0.01),('S atoms/mol fuel','S',0,2,0,0.01),('Fuel MW (kg/kmol)','mwfuel',2,250,16.043,0.01),('Fuel moisture frac','fuelmoist',0,0.40,0,0.01),('Fuel nitrogen (wt%)','fuel_nitrogen',0,3,0.05,0.01),('Fuel ash frac','fuelash',0,0.50,0,0.01)]:
             self.add_row(self.combustion_box, *spec)
 
     def build_steam(self):
-        for spec in [('Drum pressure (bar)','pbar',5,180,45,0.01),('Feedwater inlet T (C)','tfw',20,250,105,0.01),('Feedwater valve / cmd','fwcmd',1,120,20,0.01),('Steam outlet T setpoint (C)','tsteam_sp',180,620,440,0.01),('Steam demand factor','demand',0.40,1.35,1.0,0.01),('Spray water T (C)','tspray',20,220,105,0.01),('Manual spray (%)','spray_manual',0,35,0,0.01),('Drum level SP (%)','lvl_sp',30,70,50,0.01),('Initial drum level (%)','lvl_init',20,80,50,0.01),('Steam FT bias (%)','steam_ft_bias',-10,10,0,0.01),('FW FT bias (%)','fw_ft_bias',-10,10,0,0.01),('Steam FT noise (%)','steam_ft_noise',0,5,0.5,0.01),('FW FT noise (%)','fw_ft_noise',0,5,0.5,0.01),('Steam DP signal','steam_dp',0.1,5.0,1.0,0.01),('FW DP signal','fw_dp',0.1,5.0,1.0,0.01)]:
+        for spec in [('Drum pressure (bar)','pbar',5,180,45,0.01),('Feedwater inlet T (C)','tfw',20,250,105,0.01),('Feedwater valve / cmd','fwcmd',0,120,0.30,0.01),('Steam outlet T setpoint (C)','tsteam_sp',180,620,440,0.01),('Steam demand factor','demand',0.40,1.35,1.0,0.01),('Spray water T (C)','tspray',20,220,105,0.01),('Manual spray (%)','spray_manual',0,35,0,0.01),('Drum level SP (%)','lvl_sp',30,70,50,0.01),('Initial drum level (%)','lvl_init',20,80,50,0.01),('Steam FT bias (%)','steam_ft_bias',-10,10,0,0.01),('FW FT bias (%)','fw_ft_bias',-10,10,0,0.01),('Steam FT noise (%)','steam_ft_noise',0,5,0.5,0.01),('FW FT noise (%)','fw_ft_noise',0,5,0.5,0.01),('Steam DP signal','steam_dp',0.1,5.0,1.0,0.01),('FW DP signal','fw_dp',0.1,5.0,1.0,0.01)]:
             self.add_row(self.steam_box, *spec)
 
     def build_control(self):
-        for spec in [('O2 setpoint (%)','o2_sp',1,8,3,0.01),('Air PI Kp','air_kp',0,8,1.6,0.01),('Air PI Ki','air_ki',0,1.0,0.12,0.01),('Outer steam PI Kp','out_kp',0,8,1.0,0.01),('Outer steam PI Ki','out_ki',0,1.0,0.06,0.01),('Inner spray PI Kp','in_kp',0,8,1.5,0.01),('Inner spray PI Ki','in_ki',0,1.0,0.12,0.01),('Level PI Kp','lvl_kp',0,5,0.8,0.01),('Level PI Ki','lvl_ki',0,0.5,0.05,0.01),('Flow PI Kp','fw_kp',0,5,1.2,0.01),('Flow PI Ki','fw_ki',0,0.5,0.08,0.01),('Mid-temp bias (C)','mid_bias',5,80,30,0.01),('LL drum alarm (%)','lvl_ll',5,45,25,0.01),('HH drum alarm (%)','lvl_hh',55,95,75,0.01),('Steam T HH trip (C)','ttrip',350,650,540,0.01),('Stack T HH alarm (C)','stack_hh',150,450,280,0.01),('Minimum dew-point margin (C)','dew_margin_alarm',0,50,15,0.5),('Burner mixing quality (%)','burner_mixing',30,100,95,0.01),('Post-furnace air leak (%)','flue_air_leak',0,80,0,0.01),('Tube fouling / soot (%)','tube_fouling',0,100,0,0.01),('Analyzer lag (s)','analyzer_lag',0.5,30,8,0.01),('Analyzer noise level','analyzer_noise',0,5,0.5,0.01)]:
+        for spec in [('O2 setpoint (%)','o2_sp',1,8,3,0.01),('Air PI Kp','air_kp',0,8,1.6,0.01),('Air PI Ki','air_ki',0,1.0,0.12,0.01),('Outer steam PI Kp','out_kp',0,8,1.0,0.01),('Outer steam PI Ki','out_ki',0,1.0,0.06,0.01),('Inner spray PI Kp','in_kp',0,8,1.5,0.01),('Inner spray PI Ki','in_ki',0,1.0,0.12,0.01),('Level PI Kp','lvl_kp',0,5,0.8,0.01),('Level PI Ki','lvl_ki',0,0.5,0.05,0.01),('Flow PI Kp','fw_kp',0,5,0.35,0.01),('Flow PI Ki','fw_ki',0,0.5,0.08,0.01),('Mid-temp bias (C)','mid_bias',5,80,30,0.01),('LL drum alarm (%)','lvl_ll',5,45,25,0.01),('HH drum alarm (%)','lvl_hh',55,95,75,0.01),('Steam T HH trip (C)','ttrip',350,650,540,0.01),('Stack T HH alarm (C)','stack_hh',150,450,280,0.01),('Minimum dew-point margin (C)','dew_margin_alarm',0,50,15,0.5),('NOx high alarm (ppm)','nox_alarm',50,1500,300,1),('UHC high alarm (ppmC)','uhc_alarm',50,10000,500,10),('Fuel/FW warning margin (%)','fuel_warn_margin',0,50,10,1),('Fuel/FW warning delay (s)','fuel_warn_delay',1,60,10,1),('Burner mixing quality (%)','burner_mixing',30,100,95,0.01),('Post-furnace air leak (%)','flue_air_leak',0,80,0,0.01),('Tube fouling / soot (%)','tube_fouling',0,100,0,0.01),('Analyzer lag (s)','analyzer_lag',0.5,30,8,0.01),('Analyzer noise level','analyzer_noise',0,5,0.5,0.01)]:
             self.add_row(self.control_box, *spec)
 
     def make_value_label(self):
@@ -653,7 +789,7 @@ class BoilerApp(QMainWindow):
         g = QGroupBox('Measurements / indications')
         grid = QGridLayout(g)
         left_items = [('Region guess','region'),('Sat T (C)','tsat'),('h_f (kJ/kg)','hf'),('h_g (kJ/kg)','hg'),('rho_steam (kg/m3)','rhos'),('rho_fw (kg/m3)','rhof'),('Steam flow actual (kg/s)','msteam'),('Steam flow comp (kg/s)','msteamc'),('FW flow actual (kg/s)','mfw'),('FW flow comp (kg/s)','mfwc'),('Drum level (%)','drum'),('Drum mode active','mode'),('Dry O2 (%)','o2')]
-        right_items = [('Efficiency (%)','eta'),('Boiler heat (kW)','qboiler'),('Steam duty need (kW)','qsteam'),('Adequacy (%)','ad'),('Mid steam T (C)','tmid'),('Final steam T (C)','tsteam'),('Stack T (C)','tstack'),('Spray cmd (%)','spray'),('FW demand SP','fwsp'),('FW valve cmd','fwvalve'),('Alarm state','alarm'),('Trip state','trip'),('Fuel basis rate','fuelrate')]
+        right_items = [('Efficiency (%)','eta'),('Boiler heat (kW)','qboiler'),('Steam duty need (kW)','qsteam'),('Adequacy (%)','ad'),('Fuel-supported steam cap. (kg/s)','steamcap'),('Fuel/FW adequacy (%)','fuelbalance'),('Mid steam T (C)','tmid'),('Final steam T (C)','tsteam'),('Stack T (C)','tstack'),('Spray cmd (%)','spray'),('FW demand SP','fwsp'),('FW valve cmd','fwvalve'),('Alarm state','alarm'),('Trip state','trip'),('Fuel basis rate','fuelrate')]
         for i, (lab, key) in enumerate(left_items):
             grid.addWidget(QLabel(lab), i, 0)
             self.out[key] = self.make_value_label()
@@ -678,6 +814,8 @@ class BoilerApp(QMainWindow):
         self.dens_comp.setChecked(True)
         self.bumpless = QCheckBox('Bumpless mode switching')
         self.bumpless.setChecked(True)
+        self.coordinated_firing = QCheckBox('Coordinated firing follows steam demand')
+        self.coordinated_firing.setChecked(True)
         self.speed_popup = QComboBox()
         self.speed_popup.addItems(['0.5x', '1x', '2x', '5x'])
         self.speed_popup.setCurrentIndex(1)
@@ -689,6 +827,7 @@ class BoilerApp(QMainWindow):
         grid.addWidget(self.auto_steam, 1, 1)
         grid.addWidget(self.dens_comp, 2, 0)
         grid.addWidget(self.bumpless, 2, 1)
+        grid.addWidget(self.coordinated_firing, 2, 2, 1, 2)
         grid.addWidget(QLabel('Speed'), 3, 0)
         grid.addWidget(self.speed_popup, 3, 1)
         grid.addWidget(self.log_check, 3, 2)
@@ -737,6 +876,11 @@ class BoilerApp(QMainWindow):
                 'auto_air': False,
             },
             {
+                'name': 'Flame quench / incomplete hydrocarbon burnout',
+                'description': 'Reduces combustion completeness and mixing. Expect UHC and CO to rise, indicating incomplete burnout rather than a soot calculation.',
+                'values': {'eta_comb': 0.90, 'burner_mixing': 60},
+            },
+            {
                 'name': 'Post-furnace duct or casing air leak',
                 'description': 'Adds air downstream of combustion. Expect analyzer O2 to rise while CO2 and CO are diluted; the extra air does not improve the flame.',
                 'values': {'ea': 15, 'flue_air_leak': 35},
@@ -769,6 +913,17 @@ class BoilerApp(QMainWindow):
                 'description': 'Reduces the current fuel LHV by 15%. Expect lower released heat, reduced steam capability, and falling adequacy at unchanged fuel flow.',
                 'values': {},
                 'lhv_scale': 0.85,
+            },
+            {
+                'name': 'Excess firing at low steam demand',
+                'description': 'Drops steam demand to 45% while leaving firing uncoordinated at its full setting. Expect rising steam temperature and spray demand, followed by a high-temperature trip if uncorrected.',
+                'values': {'demand': 0.45},
+                'coordinated_firing': False,
+            },
+            {
+                'name': 'High fuel-nitrogen / NOx excursion',
+                'description': 'Raises fuel nitrogen to 1.5 wt%. Expect the fuel-NOx component, total analyzer NOx, and corrected NOx output to rise toward or above the alarm.',
+                'values': {'fuel_nitrogen': 1.50},
             },
             {
                 'name': 'Wet fuel / elevated flue-water loading',
@@ -926,6 +1081,11 @@ class BoilerApp(QMainWindow):
             ('Analyzer dry O2 (%)', 'o2'),
             ('Analyzer dry CO2 (%)', 'co2'),
             ('Analyzer dry CO (ppm)', 'co'),
+            ('Analyzer NOx (ppm, dry)', 'nox'),
+            ('NOx corrected to 3% O2 (ppm)', 'nox3'),
+            ('Analyzer UHC (ppmC, dry)', 'uhc'),
+            ('Flame-temperature proxy (C)', 'flamet'),
+            ('Thermal / fuel / prompt NOx (ppm)', 'noxparts'),
             ('Analyzer stack T (C)', 'stack'),
             ('Water dew point (C)', 'dewpoint'),
             ('Stack-to-dew-point margin (C)', 'dewmargin'),
@@ -952,8 +1112,8 @@ class BoilerApp(QMainWindow):
         self.fg_msg.setWordWrap(True)
         lay.addWidget(self.fg_msg)
 
-        self.fg_fig = Figure(figsize=(7.6, 4.8), dpi=100, constrained_layout=True)
-        self.fg_ax = self.fg_fig.add_subplot(111)
+        self.fg_fig = Figure(figsize=(7.6, 11.0), dpi=100, constrained_layout=True)
+        self.fg_ax = self.fg_fig.add_subplot(311)
         self.fg_ax.set_title('Combustion map: dry O2 vs CO')
         self.fg_ax.set_xlabel('Dry O2 analyzer reading (%)')
         self.fg_ax.set_ylabel('Dry CO analyzer reading (ppm)')
@@ -967,14 +1127,47 @@ class BoilerApp(QMainWindow):
         self.fg_trace, = self.fg_ax.plot([], [], 'k-', linewidth=1.4, label='Recent path')
         self.fg_point, = self.fg_ax.plot([], [], 'ro', markersize=6, label='Current')
         self.fg_ax.legend(loc='upper right', fontsize=8)
+        self.nox_ax = self.fg_fig.add_subplot(312)
+        self.nox_ax.set_title('Estimated NOx trend (teaching model)')
+        self.nox_ax.set_xlabel('Time before present (simulated s)')
+        self.nox_ax.set_ylabel('Dry NOx (ppm)')
+        self.nox_ax.set_xlim(self.hist_t[0], self.hist_t[-1])
+        self.nox_ax.set_ylim(0, 500)
+        self.nox_ax.grid(True)
+        self.nox_line, = self.nox_ax.plot(
+            self.hist_t, self.hist['fg_nox_ppm'], color='#7d1238',
+            linewidth=1.8, label='Analyzer NOx',
+        )
+        self.nox_alarm_line = self.nox_ax.axhline(
+            self.getval('nox_alarm'), color='red', linestyle='--',
+            linewidth=1, label='High alarm',
+        )
+        self.nox_ax.legend(loc='upper right', fontsize=8)
+        self.uhc_ax = self.fg_fig.add_subplot(313)
+        self.uhc_ax.set_title('Estimated unburned hydrocarbons (teaching model)')
+        self.uhc_ax.set_xlabel('Time before present (simulated s)')
+        self.uhc_ax.set_ylabel('Dry UHC (ppmC)')
+        self.uhc_ax.set_xlim(self.hist_t[0], self.hist_t[-1])
+        self.uhc_ax.set_ylim(0, 750)
+        self.uhc_ax.grid(True)
+        self.uhc_line, = self.uhc_ax.plot(
+            self.hist_t, self.hist['fg_uhc_ppmc'], color='#8b5a2b',
+            linewidth=1.8, label='Analyzer UHC',
+        )
+        self.uhc_alarm_line = self.uhc_ax.axhline(
+            self.getval('uhc_alarm'), color='red', linestyle='--',
+            linewidth=1, label='High alarm',
+        )
+        self.uhc_ax.legend(loc='upper right', fontsize=8)
         self.fg_canvas = FigureCanvas(self.fg_fig)
-        self.fg_canvas.setMinimumHeight(480)
+        self.fg_canvas.setMinimumHeight(1040)
         self.fg_canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         lay.addWidget(self.fg_canvas, 1)
 
         help_text = QLabel(
-            'Use the new controls in “Control, compensation, alarms”: Burner mixing quality, Post-furnace air leak, Tube fouling, Analyzer lag, and Analyzer noise. '
-            'Use the “Flue Fault” button for individual exercises, or “Start Demo” for an automatic guided tour through normal firing, demand response, excess air, CO breakthrough, poor mixing, air leakage, fouling, and recovery.'
+            'Use “Control, compensation, alarms” for burner mixing, air leakage, fouling, analyzer dynamics, and the NOx alarm. '
+            'Fuel nitrogen is set in “Combustion inputs”. NOx and UHC values are simplified teaching estimates, not regulatory or design predictions. '
+            'Use the dedicated Fault injection box for individual exercises or Start Demo for the guided tour.'
         )
         help_text.setWordWrap(True)
         help_text.setStyleSheet('background:#f6f6f6; padding:8px;')
@@ -990,18 +1183,24 @@ class BoilerApp(QMainWindow):
         self.tile_trip = QLabel('TRIP\nNO TRIP')
         self.tile_o2 = QLabel('DRY O2\n-- %')
         self.tile_dew = QLabel('DEW-POINT MARGIN\n-- C')
-        for lab, color in [(self.tile_mode, '#dbeaf7'), (self.tile_alarm, '#d7edd7'), (self.tile_trip, '#dbeaf7'), (self.tile_o2, '#f5f5d9'), (self.tile_dew, '#d7edd7')]:
+        self.tile_nox = QLabel('NOx\n-- ppm')
+        self.tile_uhc = QLabel('UNBURNED HYDROCARBONS\n-- ppmC')
+        self.tile_fuel_balance = QLabel('FUEL / FEEDWATER BALANCE\nNORMAL')
+        for lab, color in [(self.tile_mode, '#dbeaf7'), (self.tile_alarm, '#d7edd7'), (self.tile_trip, '#dbeaf7'), (self.tile_o2, '#f5f5d9'), (self.tile_dew, '#d7edd7'), (self.tile_nox, '#d7edd7'), (self.tile_uhc, '#d7edd7'), (self.tile_fuel_balance, '#d7edd7')]:
             lab.setAlignment(Qt.AlignCenter)
             lab.setStyleSheet(f'background:{color}; padding:20px; font-weight:bold; font-size:16px;')
         grid.addWidget(self.tile_mode, 0, 0)
         grid.addWidget(self.tile_alarm, 0, 1)
         grid.addWidget(self.tile_trip, 1, 0)
         grid.addWidget(self.tile_o2, 1, 1)
-        grid.addWidget(self.tile_dew, 2, 0, 1, 2)
+        grid.addWidget(self.tile_dew, 2, 0)
+        grid.addWidget(self.tile_nox, 2, 1)
+        grid.addWidget(self.tile_uhc, 3, 0, 1, 2)
+        grid.addWidget(self.tile_fuel_balance, 4, 0, 1, 2)
         self.alarm_msg = QLabel('Alarm interpretation panel')
         self.alarm_msg.setStyleSheet('background:#e5f0fa; padding:10px;')
         self.alarm_msg.setWordWrap(True)
-        grid.addWidget(self.alarm_msg, 3, 0, 1, 2)
+        grid.addWidget(self.alarm_msg, 5, 0, 1, 2)
         return w
 
     def get_fuel(self):
@@ -1061,11 +1260,11 @@ class BoilerApp(QMainWindow):
 
     def init_log_file(self, fname):
         with open(fname, 'w', newline='') as f:
-            csv.writer(f).writerow(['time_s', 'mode', 'fuel_flow_mol_s', 'excess_air_pct', 'drum_level_pct', 'o2_pct', 'efficiency_pct', 'boiler_heat_kw', 'steam_need_kw', 'adequacy_pct', 'steam_temp_C', 'stack_temp_C', 'water_dew_point_C', 'dew_point_margin_C', 'steam_flow_kg_s', 'fw_flow_kg_s', 'fw_sp', 'spray_pct', 'alarm', 'trip'])
+            csv.writer(f).writerow(['time_s', 'mode', 'fuel_flow_mol_s', 'actual_fuel_user_flow', 'firing_factor', 'coordinated_firing', 'excess_air_pct', 'drum_level_pct', 'o2_pct', 'co_ppm', 'nox_ppm_dry', 'nox_ppm_at_3pct_o2', 'uhc_ppmC_dry', 'flame_temp_proxy_C', 'efficiency_pct', 'boiler_heat_kw', 'steam_need_kw', 'adequacy_pct', 'fuel_supported_steam_capacity_kg_s', 'fuel_feedwater_adequacy_pct', 'fuel_feedwater_warning', 'steam_temp_C', 'stack_temp_C', 'water_dew_point_C', 'dew_point_margin_C', 'steam_flow_kg_s', 'fw_flow_kg_s', 'fw_sp', 'spray_pct', 'alarm', 'trip'])
 
     def append_log_row(self, fname, tsim, mode_name, p, s, fw_sp, alarm_txt, trip_txt):
         with open(fname, 'a', newline='') as f:
-            csv.writer(f).writerow([f'{tsim:.4f}', clean_csv(mode_name), f"{p['nf']:.6f}", f"{p['ea']:.6f}", f"{s['drum']:.6f}", f"{s['o2']:.6f}", f"{s['eta']:.6f}", f"{s['qboiler']:.6f}", f"{s['qsteam']:.6f}", f"{s['adequacy']:.6f}", f"{s['tsteam']:.6f}", f"{s['tstack']:.6f}", f"{s['dew_point']:.6f}", f"{s['dew_margin']:.6f}", f"{s['steamflow']:.6f}", f"{s['fwflow']:.6f}", f'{fw_sp:.6f}', f"{s['spray']:.6f}", clean_csv(alarm_txt), clean_csv(trip_txt)])
+            csv.writer(f).writerow([f'{tsim:.4f}', clean_csv(mode_name), f"{p['nf']:.6f}", f"{s['actual_fuel_user_flow']:.6f}", f"{s['firing_factor']:.6f}", int(bool(p.get('coordinated_firing', False))), f"{p['ea']:.6f}", f"{s['drum']:.6f}", f"{s['o2']:.6f}", f"{s['fg_co_ppm']:.6f}", f"{s['fg_nox_ppm']:.6f}", f"{s['nox_corrected_3pct']:.6f}", f"{s['fg_uhc_ppmc']:.6f}", f"{s['flame_temp']:.6f}", f"{s['eta']:.6f}", f"{s['qboiler']:.6f}", f"{s['qsteam']:.6f}", f"{s['adequacy']:.6f}", f"{s['steam_capacity']:.6f}", f"{s['fuel_balance_pct']:.6f}", int(bool(s['fuel_warning'])), f"{s['tsteam']:.6f}", f"{s['tstack']:.6f}", f"{s['dew_point']:.6f}", f"{s['dew_margin']:.6f}", f"{s['steamflow']:.6f}", f"{s['fwflow']:.6f}", f'{fw_sp:.6f}', f"{s['spray']:.6f}", clean_csv(alarm_txt), clean_csv(trip_txt)])
 
     def toggle_log_cb(self):
         self.log_enabled = self.log_check.isChecked()
@@ -1075,10 +1274,15 @@ class BoilerApp(QMainWindow):
             self.init_log_file(self.log_file)
 
     def rd(self):
-        names = ['fuel_flow_user', 'ea', 'tair', 'tfuel', 'eta_comb', 'loss', 'capture', 'lhv', 'C', 'H', 'O', 'S', 'mwfuel', 'fuelmoist', 'fuelash', 'pbar', 'tfw', 'fwcmd', 'tsteam_sp', 'demand', 'tspray', 'spray_manual', 'lvl_sp', 'lvl_init', 'steam_ft_bias', 'fw_ft_bias', 'steam_ft_noise', 'fw_ft_noise', 'steam_dp', 'fw_dp', 'o2_sp', 'air_kp', 'air_ki', 'out_kp', 'out_ki', 'in_kp', 'in_ki', 'lvl_kp', 'lvl_ki', 'fw_kp', 'fw_ki', 'mid_bias', 'lvl_ll', 'lvl_hh', 'ttrip', 'stack_hh', 'dew_margin_alarm', 'burner_mixing', 'flue_air_leak', 'tube_fouling', 'analyzer_lag', 'analyzer_noise']
+        names = ['fuel_flow_user', 'ea', 'tair', 'tfuel', 'eta_comb', 'loss', 'capture', 'lhv', 'C', 'H', 'O', 'S', 'mwfuel', 'fuelmoist', 'fuel_nitrogen', 'fuelash', 'pbar', 'tfw', 'fwcmd', 'tsteam_sp', 'demand', 'tspray', 'spray_manual', 'lvl_sp', 'lvl_init', 'steam_ft_bias', 'fw_ft_bias', 'steam_ft_noise', 'fw_ft_noise', 'steam_dp', 'fw_dp', 'o2_sp', 'air_kp', 'air_ki', 'out_kp', 'out_ki', 'in_kp', 'in_ki', 'lvl_kp', 'lvl_ki', 'fw_kp', 'fw_ki', 'mid_bias', 'lvl_ll', 'lvl_hh', 'ttrip', 'stack_hh', 'dew_margin_alarm', 'nox_alarm', 'uhc_alarm', 'fuel_warn_margin', 'fuel_warn_delay', 'burner_mixing', 'flue_air_leak', 'tube_fouling', 'analyzer_lag', 'analyzer_noise']
         p = {n: self.getval(n) for n in names}
         fuel = self.get_fuel()
+        p['coordinated_firing'] = (
+            self.coordinated_firing.isChecked()
+            if hasattr(self, 'coordinated_firing') else False
+        )
         p['fuel_unit'] = fuel['flow_unit']
+        p['fuel_phase'] = fuel['phase']
         if fuel['flow_unit'] == 'Nm3/hr':
             p['nf'] = p['fuel_flow_user'] * fuel['Nm3_to_kmol'] * 1000 / 3600
             p['fuel_mass_kgps'] = p['nf'] * p['mwfuel'] / 1000
@@ -1129,9 +1333,9 @@ class BoilerApp(QMainWindow):
         self.lock_comp.setChecked(True)
         self.fuel_cb()
         d = fuel_defaults(1)
-        for k, v in [('C', d['C']), ('H', d['H']), ('O', d['O']), ('S', d['S']), ('lhv', d['LHV']), ('mwfuel', d['MW']), ('fuelmoist', d['moist']), ('fuelash', d['ash'])]:
+        for k, v in [('C', d['C']), ('H', d['H']), ('O', d['O']), ('S', d['S']), ('lhv', d['LHV']), ('mwfuel', d['MW']), ('fuelmoist', d['moist']), ('fuel_nitrogen', 0.05), ('fuelash', d['ash'])]:
             self.setpair(k, v)
-        vals = {'fuel_flow_user':100, 'ea':15, 'tair':25, 'tfuel':25, 'eta_comb':0.99, 'loss':3, 'capture':0.82, 'pbar':45, 'tfw':105, 'fwcmd':20, 'tsteam_sp':440, 'demand':1.0, 'tspray':105, 'spray_manual':0, 'lvl_sp':50, 'lvl_init':50, 'steam_ft_bias':0, 'fw_ft_bias':0, 'steam_ft_noise':0.5, 'fw_ft_noise':0.5, 'steam_dp':1.0, 'fw_dp':1.0, 'o2_sp':3, 'air_kp':1.6, 'air_ki':0.12, 'out_kp':1.0, 'out_ki':0.06, 'in_kp':1.5, 'in_ki':0.12, 'lvl_kp':0.8, 'lvl_ki':0.05, 'fw_kp':1.2, 'fw_ki':0.08, 'mid_bias':30, 'lvl_ll':25, 'lvl_hh':75, 'ttrip':540, 'stack_hh':280, 'dew_margin_alarm':15, 'burner_mixing':95, 'flue_air_leak':0, 'tube_fouling':0, 'analyzer_lag':8, 'analyzer_noise':0.5}
+        vals = {'fuel_flow_user':100, 'ea':15, 'tair':25, 'tfuel':25, 'eta_comb':0.99, 'loss':3, 'capture':0.82, 'pbar':45, 'tfw':105, 'fwcmd':0.30, 'tsteam_sp':440, 'demand':1.0, 'tspray':105, 'spray_manual':0, 'lvl_sp':50, 'lvl_init':50, 'steam_ft_bias':0, 'fw_ft_bias':0, 'steam_ft_noise':0.5, 'fw_ft_noise':0.5, 'steam_dp':1.0, 'fw_dp':1.0, 'o2_sp':3, 'air_kp':1.6, 'air_ki':0.12, 'out_kp':1.0, 'out_ki':0.06, 'in_kp':1.5, 'in_ki':0.12, 'lvl_kp':0.8, 'lvl_ki':0.05, 'fw_kp':0.35, 'fw_ki':0.08, 'mid_bias':30, 'lvl_ll':25, 'lvl_hh':75, 'ttrip':540, 'stack_hh':280, 'dew_margin_alarm':15, 'nox_alarm':300, 'uhc_alarm':500, 'fuel_warn_margin':10, 'fuel_warn_delay':10, 'burner_mixing':95, 'flue_air_leak':0, 'tube_fouling':0, 'analyzer_lag':8, 'analyzer_noise':0.5}
         for k, v in vals.items():
             self.setpair(k, v)
         self.mode_popup.setCurrentIndex(3)
@@ -1139,12 +1343,30 @@ class BoilerApp(QMainWindow):
         self.auto_steam.setChecked(True)
         self.dens_comp.setChecked(True)
         self.bumpless.setChecked(True)
+        self.coordinated_firing.setChecked(True)
         self.speed_popup.setCurrentIndex(1)
         for k in self.hist:
             self.hist[k] = [math.nan] * self.hist_n
         self.tick = 0
-        self.state = dict(o2=3, eta=80, qboiler=0, qsteam=0, adequacy=100, tstack=180, dew_point=55, dew_margin=125, tmid=450, tsteam=440, instab=0, drum=self.getval('lvl_init'), steamflow=20, fwflow=20, spray=0, trip=0, alarm=0, fwvalve=20, sim_time=0, realtime=0, fuel_user_flow=100, fuel_nmolps=1, fuel_unit='Nm3/hr', fg_o2=3, fg_co2=9, fg_co_ppm=300, fg_stack=180)
-        self.mem = dict(int_o2=0, int_ot=0, int_it=0, int_lvl=0, int_fic=0, phase=0)
+        initial_level = self.getval('lvl_init')
+        self.state = dict(o2=3, eta=80, qboiler=0, qsteam=0, adequacy=100, tstack=180, dew_point=55, dew_margin=125, flame_temp=1900, nox_corrected_3pct=120, steam_capacity=0.30, fuel_balance_pct=100, fuel_warning=False, fuel_warn_time=0, firing_factor=1.0, actual_fuel_user_flow=100, tmid=450, tsteam=440, instab=0, drum=initial_level, drum_inventory=initial_level, swell=0, previous_steamflow=0.30, steamflow=0.30, fwflow=0.30, spray=0, trip=0, alarm=0, fwvalve=0.30, sim_time=0, realtime=0, fuel_user_flow=100, fuel_nmolps=1, fuel_unit='Nm3/hr', fg_o2=3, fg_co2=9, fg_co_ppm=300, fg_nox_ppm=120, fg_uhc_ppmc=30, fg_stack=180)
+        self.mem = dict(
+            int_o2=0, int_ot=0, int_it=0, int_lvl=0, int_fic=0,
+            lvltrim=0, mid_sp=self.getval('tsteam_sp'), phase=0,
+        )
+        initial_model = plant_calc_if97(
+            self.rd(), self.state, self.mem['phase'],
+            1 if self.dens_comp.isChecked() else 0,
+        )
+        balanced_flow = initial_model['msteam_actual']
+        self.setpair('fwcmd', balanced_flow)
+        self.state.update(
+            steam_capacity=initial_model['steam_capacity'],
+            steamflow=balanced_flow,
+            previous_steamflow=balanced_flow,
+            fwflow=balanced_flow,
+            fwvalve=balanced_flow,
+        )
         self.simulate_one_step()
 
     def start_demo_cb(self):
@@ -1324,15 +1546,16 @@ class BoilerApp(QMainWindow):
 
     def capture_fault_baseline(self):
         keys = [
-            'ea', 'burner_mixing', 'flue_air_leak', 'tube_fouling',
+            'ea', 'eta_comb', 'demand', 'burner_mixing', 'flue_air_leak', 'tube_fouling',
             'analyzer_lag', 'analyzer_noise', 'steam_ft_bias',
             'steam_ft_noise', 'fw_ft_bias', 'fw_ft_noise', 'lhv',
-            'fuelmoist',
+            'fuelmoist', 'fuel_nitrogen',
         ]
         return {
             'values': {key: self.getval(key) for key in keys},
             'auto_air': self.auto_air.isChecked(),
             'auto_steam': self.auto_steam.isChecked(),
+            'coordinated_firing': self.coordinated_firing.isChecked(),
             'mode_index': self.mode_popup.currentIndex(),
         }
 
@@ -1343,6 +1566,9 @@ class BoilerApp(QMainWindow):
             self.setpair(key, value)
         self.auto_air.setChecked(self.fault_baseline['auto_air'])
         self.auto_steam.setChecked(self.fault_baseline['auto_steam'])
+        self.coordinated_firing.setChecked(
+            self.fault_baseline['coordinated_firing']
+        )
         self.mode_popup.setCurrentIndex(self.fault_baseline['mode_index'])
 
     def inject_fault_cb(self):
@@ -1362,6 +1588,8 @@ class BoilerApp(QMainWindow):
             self.auto_air.setChecked(case['auto_air'])
         if 'auto_steam' in case:
             self.auto_steam.setChecked(case['auto_steam'])
+        if 'coordinated_firing' in case:
+            self.coordinated_firing.setChecked(case['coordinated_firing'])
         if 'mode_index' in case:
             self.mode_popup.setCurrentIndex(case['mode_index'])
 
@@ -1437,22 +1665,30 @@ class BoilerApp(QMainWindow):
         true_o2 = model['dry_O2']
         true_co2 = model['dry_CO2']
         true_co_ppm = model['co_ppm']
+        true_nox_ppm = model['nox_ppm']
+        true_uhc_ppmc = model['uhc_ppmc']
         true_stack = model['tstack']
 
         target_o2 = clamp(true_o2 + 0.035 * noise * math.sin(2.1 * phase), 0, 25)
         target_co2 = clamp(true_co2 + 0.030 * noise * math.cos(1.7 * phase), 0, 25)
         target_co = max(0, true_co_ppm + 30 * noise * math.sin(2.7 * phase))
+        target_nox = max(0, true_nox_ppm + 8 * noise * math.cos(2.3 * phase))
+        target_uhc = max(0, true_uhc_ppmc + 12 * noise * math.sin(1.9 * phase))
         target_stack = max(0, true_stack + 0.8 * noise * math.cos(1.3 * phase))
 
         self.state['fg_o2'] = lag(self.state.get('fg_o2', target_o2), target_o2, lag_s / self.dt)
         self.state['fg_co2'] = lag(self.state.get('fg_co2', target_co2), target_co2, lag_s / self.dt)
         self.state['fg_co_ppm'] = lag(self.state.get('fg_co_ppm', target_co), target_co, lag_s / self.dt)
+        self.state['fg_nox_ppm'] = lag(self.state.get('fg_nox_ppm', target_nox), target_nox, lag_s / self.dt)
+        self.state['fg_uhc_ppmc'] = lag(self.state.get('fg_uhc_ppmc', target_uhc), target_uhc, lag_s / self.dt)
         self.state['fg_stack'] = lag(self.state.get('fg_stack', target_stack), target_stack, lag_s / self.dt)
 
     def flue_diagnosis(self, p, model):
         o2 = self.state.get('fg_o2', model['dry_O2'])
         co2 = self.state.get('fg_co2', model['dry_CO2'])
         co = self.state.get('fg_co_ppm', model['co_ppm'])
+        nox = self.state.get('fg_nox_ppm', model['nox_ppm'])
+        uhc = self.state.get('fg_uhc_ppmc', model['uhc_ppmc'])
         stack = self.state.get('fg_stack', model['tstack'])
         leak = p.get('flue_air_leak', 0.0)
         mixing = p.get('burner_mixing', 95.0)
@@ -1487,6 +1723,18 @@ class BoilerApp(QMainWindow):
             reason = 'O2 is elevated and CO2 is diluted. The extra oxygen may be entering after combustion, so it does not prove that the flame has enough air.'
             action = 'Inspect casing, access doors, ducting, economizer outlet, and sampling line for air ingress.'
             effnote = 'A leaking sample path can mislead O2 trim and cause the controller to remove too much combustion air.'
+            color = '#fadbc2'
+        elif nox >= p.get('nox_alarm', 300):
+            condition = 'High estimated NOx emissions'
+            reason = 'The simplified thermal, fuel, and prompt NOx contributions exceed the configured analyzer alarm.'
+            action = 'Check excess air, air preheat, firing intensity, burner staging/mixing, and fuel-nitrogen input.'
+            effnote = 'NOx reduction can trade against CO and efficiency; adjust combustion conditions while trending all three.'
+            color = '#fadbc2'
+        elif uhc >= p.get('uhc_alarm', 500):
+            condition = 'High estimated unburned hydrocarbons'
+            reason = 'The simplified UHC estimate indicates incomplete hydrocarbon burnout from richness, quenching, or poor mixing.'
+            action = 'Check flame stability, fuel preparation/atomization, burner mixing, excess air, and furnace temperature.'
+            effnote = 'Unburned fuel represents lost chemical energy and should be interpreted together with CO.'
             color = '#fadbc2'
         elif fouling > 25 or (stack > 0.9 * p.get('stack_hh', 280) and 2.0 <= o2 <= 7.0):
             condition = 'Heat-transfer fouling / soot suspected'
@@ -1545,9 +1793,28 @@ class BoilerApp(QMainWindow):
         self.state['fuel_unit'] = p['fuel_unit']
         self.state['sim_time'] += self.dt
         self.state['realtime'] = self.tick * self.dt
+        if p.get('coordinated_firing', False) and self.state['trip'] == 0:
+            self.state['firing_factor'] = lag(
+                self.state.get('firing_factor', 1.0),
+                p['demand'],
+                8.0 / self.dt,
+            )
+        elif self.state['trip'] == 0:
+            self.state['firing_factor'] = lag(
+                self.state.get('firing_factor', 1.0),
+                1.0,
+                4.0 / self.dt,
+            )
+        self.state['actual_fuel_user_flow'] = (
+            p['fuel_flow_user'] * self.state['firing_factor']
+        )
+        p['nf'] *= self.state['firing_factor']
+        p['fuel_mass_kgps'] *= self.state['firing_factor']
         if self.state['trip'] == 1:
             p['nf'] = 0
-            p['fwcmd'] = 5
+            p['fuel_mass_kgps'] = 0
+            self.state['actual_fuel_user_flow'] = 0
+            p['fwcmd'] = 0
             p['spray_manual'] = 20
         if self.auto_air.isChecked() and self.state['trip'] == 0:
             ea_cmd, self.mem['int_o2'] = pi_ctrl(self.getval('ea'), self.state['o2'], p['o2_sp'], p['air_kp'], p['air_ki'], self.mem['int_o2'], self.dt, 0, 150)
@@ -1555,7 +1822,8 @@ class BoilerApp(QMainWindow):
             p['ea'] = ea_cmd
         mid_sp = p['tsteam_sp'] + p['mid_bias']
         if self.auto_steam.isChecked() and self.state['trip'] == 0:
-            mid_sp, self.mem['int_ot'] = pi_ctrl(mid_sp, self.state['tsteam'], p['tsteam_sp'], p['out_kp'], p['out_ki'], self.mem['int_ot'], self.dt, p['tsteam_sp'], p['tsteam_sp'] + p['mid_bias'])
+            mid_sp, self.mem['int_ot'] = pi_ctrl(self.mem.get('mid_sp', mid_sp), self.state['tsteam'], p['tsteam_sp'], p['out_kp'], p['out_ki'], self.mem['int_ot'], self.dt, p['tsteam_sp'], p['tsteam_sp'] + p['mid_bias'])
+            self.mem['mid_sp'] = mid_sp
             spray_cmd, self.mem['int_it'] = pi_ctrl(self.getval('spray_manual'), self.state['tmid'], mid_sp, p['in_kp'], p['in_ki'], self.mem['int_it'], self.dt, 0, 35)
             self.setpair('spray_manual', spray_cmd)
             p['spray_manual'] = spray_cmd
@@ -1564,15 +1832,16 @@ class BoilerApp(QMainWindow):
         mode_id, mode_name = select_mode(self.mode_sel_value(), model, p)
         if self.state['trip'] == 0:
             if mode_id == 1:
-                fwcmd, self.mem['int_lvl'] = pi_ctrl(self.getval('fwcmd'), self.state['drum'], p['lvl_sp'], p['lvl_kp'], p['lvl_ki'], self.mem['int_lvl'], self.dt, 1, 120)
+                fwcmd, self.mem['int_lvl'] = pi_ctrl(self.getval('fwcmd'), self.state['drum'], p['lvl_sp'], p['lvl_kp'], p['lvl_ki'], self.mem['int_lvl'], self.dt, 0, 120)
                 fw_sp = fwcmd
             else:
-                lvltrim, self.mem['int_lvl'] = pi_ctrl(0, self.state['drum'], p['lvl_sp'], p['lvl_kp'], p['lvl_ki'], self.mem['int_lvl'], self.dt, -30, 30)
+                lvltrim, self.mem['int_lvl'] = pi_ctrl(self.mem.get('lvltrim', 0), self.state['drum'], p['lvl_sp'], p['lvl_kp'], p['lvl_ki'], self.mem['int_lvl'], self.dt, -30, 30)
+                self.mem['lvltrim'] = lvltrim
                 fw_sp = max(0, model['msteam_comp'] + lvltrim)
-                fwcmd, self.mem['int_fic'] = pi_ctrl(self.getval('fwcmd'), model['mfw_comp_meas'], fw_sp, p['fw_kp'], p['fw_ki'], self.mem['int_fic'], self.dt, 1, 120)
+                fwcmd, self.mem['int_fic'] = pi_ctrl(self.getval('fwcmd'), model['mfw_comp_meas'], fw_sp, p['fw_kp'], p['fw_ki'], self.mem['int_fic'], self.dt, 0, 120)
         else:
-            fw_sp = 5
-            fwcmd = 5
+            fw_sp = 0
+            fwcmd = 0
         if self.bumpless.isChecked():
             self.setpair('fwcmd', fwcmd)
         p['fwcmd'] = fwcmd
@@ -1585,20 +1854,64 @@ class BoilerApp(QMainWindow):
         self.state['tstack'] = lag(self.state['tstack'], model['tstack'], 8 / self.dt)
         self.state['dew_point'] = model['dew_point']
         self.state['dew_margin'] = self.state['tstack'] - self.state['dew_point']
+        self.state['flame_temp'] = model['flame_temp']
         self.state['tmid'] = lag(self.state['tmid'], model['tmid'], 10 / self.dt)
         self.state['tsteam'] = lag(self.state['tsteam'], model['tsteam'], 12 / self.dt)
         self.state['spray'] = lag(self.state['spray'], p['spray_manual'], 2 / self.dt)
         self.state['steamflow'] = lag(self.state['steamflow'], model['msteam_actual'], 3 / self.dt)
         self.state['fwflow'] = lag(self.state['fwflow'], model['mfw_actual'], 3 / self.dt)
         self.state['fwvalve'] = lag(self.state['fwvalve'], p['fwcmd'], 2 / self.dt)
-        swell = 0.75 * (self.state['steamflow'] - self.state['fwflow']) / max(self.state['steamflow'] + 1, 1)
-        level_rate = 0.22 * (self.state['fwflow'] - self.state['steamflow']) - swell
-        self.state['drum'] = clamp(self.state['drum'] + self.dt * level_rate, 0, 100)
+        self.state['steam_capacity'] = model['steam_capacity']
+        self.state['fuel_balance_pct'] = (
+            100 * self.state['steam_capacity'] / max(self.state['fwflow'], 0.05)
+        )
+        fuel_deficit = (
+            self.state['fwflow'] > 0.1
+            and self.state['fuel_balance_pct'] < 100 - p['fuel_warn_margin']
+        )
+        if fuel_deficit:
+            self.state['fuel_warn_time'] = min(
+                p['fuel_warn_delay'],
+                self.state['fuel_warn_time'] + self.dt,
+            )
+        else:
+            self.state['fuel_warn_time'] = max(
+                0.0, self.state['fuel_warn_time'] - 2 * self.dt
+            )
+        self.state['fuel_warning'] = (
+            self.state['fuel_warn_time'] >= p['fuel_warn_delay']
+        )
+        # True inventory changes only with the mass-flow imbalance.
+        inventory_rate = 0.22 * (
+            self.state['fwflow'] - self.state['steamflow']
+        )
+        self.state['drum_inventory'] = clamp(
+            self.state['drum_inventory'] + self.dt * inventory_rate, 0, 100
+        )
+
+        # Shrink/swell is a temporary indicated-level effect driven by changes
+        # in steam release, not a permanent addition to drum inventory.
+        steam_rate = (
+            self.state['steamflow'] - self.state['previous_steamflow']
+        ) / max(self.dt, 1e-9)
+        swell_target = clamp(2.0 * steam_rate, -8.0, 8.0)
+        self.state['swell'] = lag(
+            self.state['swell'], swell_target, 6.0 / self.dt
+        )
+        self.state['previous_steamflow'] = self.state['steamflow']
+        self.state['drum'] = clamp(
+            self.state['drum_inventory'] + self.state['swell'], 0, 100
+        )
+        self.update_flue_analyzer(p, model)
+        self.state['nox_corrected_3pct'] = (
+            self.state['fg_nox_ppm']
+            * (20.9 - 3.0)
+            / max(20.9 - self.state['fg_o2'], 1.0)
+        )
         alarm_txt, trip_txt, alarm_code, trip_code = alarms_and_trip(self.state, p)
         self.state['alarm'] = alarm_code
         if trip_code == 1:
             self.state['trip'] = 1
-        self.update_flue_analyzer(p, model)
         self.hist['eta'] = shift(self.hist['eta'], self.state['eta'])
         self.hist['ad'] = shift(self.hist['ad'], self.state['adequacy'])
         self.hist['drum'] = shift(self.hist['drum'], self.state['drum'])
@@ -1614,7 +1927,9 @@ class BoilerApp(QMainWindow):
         self.hist['fg_o2'] = shift(self.hist['fg_o2'], self.state['fg_o2'])
         self.hist['fg_co2'] = shift(self.hist['fg_co2'], self.state['fg_co2'])
         self.hist['fg_co_ppm'] = shift(self.hist['fg_co_ppm'], self.state['fg_co_ppm'])
-        vals = {'region': model['region'], 'tsat': f"{model['Tsat']:.2f}", 'hf': f"{model['hf']:.1f}", 'hg': f"{model['hg']:.1f}", 'rhos': f"{model['rho_steam']:.3f}", 'rhof': f"{model['rho_fw']:.1f}", 'msteam': f"{model['msteam_actual']:.2f}", 'msteamc': f"{model['msteam_comp']:.2f}", 'mfw': f"{model['mfw_actual']:.2f}", 'mfwc': f"{model['mfw_comp_meas']:.2f}", 'drum': f"{self.state['drum']:.1f}", 'mode': mode_name, 'o2': f"{self.state['o2']:.3f}", 'eta': f"{self.state['eta']:.2f}", 'qboiler': f"{self.state['qboiler']:.1f}", 'qsteam': f"{self.state['qsteam']:.1f}", 'ad': f"{self.state['adequacy']:.1f}", 'tmid': f"{self.state['tmid']:.1f}", 'tsteam': f"{self.state['tsteam']:.1f}", 'tstack': f"{self.state['tstack']:.1f}", 'spray': f"{self.state['spray']:.1f}", 'fwsp': f"{fw_sp:.2f}", 'fwvalve': f"{self.state['fwvalve']:.2f}", 'alarm': alarm_txt, 'trip': trip_txt, 'fuelrate': f"{self.state['fuel_user_flow']:.2f} {self.state['fuel_unit']}"}
+        self.hist['fg_nox_ppm'] = shift(self.hist['fg_nox_ppm'], self.state['fg_nox_ppm'])
+        self.hist['fg_uhc_ppmc'] = shift(self.hist['fg_uhc_ppmc'], self.state['fg_uhc_ppmc'])
+        vals = {'region': model['region'], 'tsat': f"{model['Tsat']:.2f}", 'hf': f"{model['hf']:.1f}", 'hg': f"{model['hg']:.1f}", 'rhos': f"{model['rho_steam']:.3f}", 'rhof': f"{model['rho_fw']:.1f}", 'msteam': f"{model['msteam_actual']:.2f}", 'msteamc': f"{model['msteam_comp']:.2f}", 'mfw': f"{model['mfw_actual']:.2f}", 'mfwc': f"{model['mfw_comp_meas']:.2f}", 'drum': f"{self.state['drum']:.1f}", 'mode': mode_name, 'o2': f"{self.state['o2']:.3f}", 'eta': f"{self.state['eta']:.2f}", 'qboiler': f"{self.state['qboiler']:.1f}", 'qsteam': f"{self.state['qsteam']:.1f}", 'ad': f"{self.state['adequacy']:.1f}", 'steamcap': f"{self.state['steam_capacity']:.2f}", 'fuelbalance': f"{self.state['fuel_balance_pct']:.1f}", 'tmid': f"{self.state['tmid']:.1f}", 'tsteam': f"{self.state['tsteam']:.1f}", 'tstack': f"{self.state['tstack']:.1f}", 'spray': f"{self.state['spray']:.1f}", 'fwsp': f"{fw_sp:.2f}", 'fwvalve': f"{self.state['fwvalve']:.2f}", 'alarm': alarm_txt, 'trip': trip_txt, 'fuelrate': f"{self.state['actual_fuel_user_flow']:.2f} {self.state['fuel_unit']} actual ({self.state['firing_factor']:.2f}x)"}
         for k, v in vals.items():
             self.out[k].setText(v)
         self.conv['usr'].setText(f"{self.state['fuel_user_flow']:.2f}")
@@ -1636,6 +1951,14 @@ class BoilerApp(QMainWindow):
             self.fg['o2'].setText(f"{self.state['fg_o2']:.2f}")
             self.fg['co2'].setText(f"{self.state['fg_co2']:.2f}")
             self.fg['co'].setText(f"{self.state['fg_co_ppm']:.0f}")
+            self.fg['nox'].setText(f"{self.state['fg_nox_ppm']:.0f}")
+            self.fg['nox3'].setText(f"{self.state['nox_corrected_3pct']:.0f}")
+            self.fg['uhc'].setText(f"{self.state['fg_uhc_ppmc']:.0f}")
+            self.fg['flamet'].setText(f"{model['flame_temp']:.0f}")
+            self.fg['noxparts'].setText(
+                f"{model['thermal_nox']:.0f} / {model['fuel_nox']:.0f} / "
+                f"{model['prompt_nox']:.0f}"
+            )
             self.fg['stack'].setText(f"{self.state['fg_stack']:.1f}")
             self.fg['dewpoint'].setText(f"{self.state['dew_point']:.1f}")
             self.fg['dewmargin'].setText(f"{self.state['dew_margin']:.1f}")
@@ -1658,11 +1981,28 @@ class BoilerApp(QMainWindow):
         dew_alarm = self.state['dew_margin'] <= p['dew_margin_alarm']
         self.tile_dew.setText(f"DEW-POINT MARGIN\n{self.state['dew_margin']:.1f} C")
         self.tile_dew.setStyleSheet(f"background:{'#facccc' if dew_alarm else '#d7edd7'}; padding:20px; font-weight:bold; font-size:16px;")
-        self.alarm_msg.setText(f"Mode: {mode_name}\nAlarm: {alarm_txt}\nTrip: {trip_txt}\nDry O2: {self.state['o2']:.2f} %\nDrum level: {self.state['drum']:.1f} %\nStack T: {self.state['tstack']:.1f} C\nWater dew point: {self.state['dew_point']:.1f} C\nDew-point margin: {self.state['dew_margin']:.1f} C (alarm at <= {p['dew_margin_alarm']:.1f} C)")
-        if self.demo_active:
-            self.status.setText(f"DEMO MODE | {self.demo_message} | Mode={mode_name} | Alarm={alarm_txt} | Trip={trip_txt} | Diagnosis={condition} | O2={self.state['fg_o2']:.2f}% | CO={self.state['fg_co_ppm']:.0f} ppm.")
+        nox_alarm = self.state['fg_nox_ppm'] >= p['nox_alarm']
+        self.tile_nox.setText(f"NOx\n{self.state['fg_nox_ppm']:.0f} ppm")
+        self.tile_nox.setStyleSheet(f"background:{'#facccc' if nox_alarm else '#d7edd7'}; padding:20px; font-weight:bold; font-size:16px;")
+        uhc_alarm = self.state['fg_uhc_ppmc'] >= p['uhc_alarm']
+        self.tile_uhc.setText(f"UNBURNED HYDROCARBONS\n{self.state['fg_uhc_ppmc']:.0f} ppmC")
+        self.tile_uhc.setStyleSheet(f"background:{'#facccc' if uhc_alarm else '#d7edd7'}; padding:20px; font-weight:bold; font-size:16px;")
+        if self.state['fuel_warning']:
+            fuel_warning_text = 'LOW FUEL FOR FEEDWATER - DRUM FILL EXPECTED'
+            fuel_warning_color = '#ffd59e'
         else:
-            self.status.setText(f"PyQt translation active. Current mode: {mode_name} | Alarm={alarm_txt} | Trip={trip_txt} | Flue diagnosis={condition} | O2={self.state['fg_o2']:.2f}% | CO={self.state['fg_co_ppm']:.0f} ppm.")
+            fuel_warning_text = 'NORMAL'
+            fuel_warning_color = '#d7edd7'
+        self.tile_fuel_balance.setText(
+            f"FUEL / FEEDWATER BALANCE\n{fuel_warning_text}\n"
+            f"{self.state['fuel_balance_pct']:.0f}% adequate"
+        )
+        self.tile_fuel_balance.setStyleSheet(f"background:{fuel_warning_color}; padding:20px; font-weight:bold; font-size:16px;")
+        self.alarm_msg.setText(f"Mode: {mode_name}\nAlarm: {alarm_txt}\nTrip: {trip_txt}\nFuel/feedwater warning: {fuel_warning_text}\nFuel-supported steam capacity: {self.state['steam_capacity']:.2f} kg/s\nFeedwater flow: {self.state['fwflow']:.2f} kg/s\nFuel/feedwater adequacy: {self.state['fuel_balance_pct']:.1f}%\nDry O2: {self.state['o2']:.2f} %\nNOx: {self.state['fg_nox_ppm']:.0f} ppm (alarm at >= {p['nox_alarm']:.0f} ppm)\nNOx corrected to 3% O2: {self.state['nox_corrected_3pct']:.0f} ppm\nUHC: {self.state['fg_uhc_ppmc']:.0f} ppmC (alarm at >= {p['uhc_alarm']:.0f} ppmC)\nDrum level: {self.state['drum']:.1f} %\nStack T: {self.state['tstack']:.1f} C\nWater dew point: {self.state['dew_point']:.1f} C\nDew-point margin: {self.state['dew_margin']:.1f} C (alarm at <= {p['dew_margin_alarm']:.1f} C)")
+        if self.demo_active:
+            self.status.setText(f"DEMO MODE | {self.demo_message} | Mode={mode_name} | Alarm={alarm_txt} | Trip={trip_txt} | Fuel/FW={fuel_warning_text} | Diagnosis={condition} | O2={self.state['fg_o2']:.2f}% | CO={self.state['fg_co_ppm']:.0f} ppm | NOx={self.state['fg_nox_ppm']:.0f} ppm | UHC={self.state['fg_uhc_ppmc']:.0f} ppmC.")
+        else:
+            self.status.setText(f"PyQt translation active. Current mode: {mode_name} | Alarm={alarm_txt} | Trip={trip_txt} | Fuel/FW={fuel_warning_text} | Flue diagnosis={condition} | O2={self.state['fg_o2']:.2f}% | CO={self.state['fg_co_ppm']:.0f} ppm | NOx={self.state['fg_nox_ppm']:.0f} ppm | UHC={self.state['fg_uhc_ppmc']:.0f} ppmC.")
         if self.log_enabled:
             self.append_log_row(self.log_file, self.state['sim_time'], mode_name, p, self.state, fw_sp, alarm_txt, trip_txt)
         self.updplots()
@@ -1714,6 +2054,20 @@ class BoilerApp(QMainWindow):
         self.fg_point.set_data([xs[-1]], [ys[-1]])
         self.fg_ax.set_xlim(0, max(12, min(25, max(xs) * 1.15 + 0.5)))
         self.fg_ax.set_ylim(0, max(5000, min(50000, max(ys) * 1.25 + 200)))
+        nox_values = finite_vals(self.hist.get('fg_nox_ppm', []))
+        self.nox_line.set_ydata(self.hist['fg_nox_ppm'])
+        nox_alarm = self.getval('nox_alarm')
+        self.nox_alarm_line.set_ydata([nox_alarm, nox_alarm])
+        self.nox_ax.set_ylim(
+            0, max(100, nox_alarm * 1.2, max(nox_values, default=0) * 1.2)
+        )
+        uhc_values = finite_vals(self.hist.get('fg_uhc_ppmc', []))
+        self.uhc_line.set_ydata(self.hist['fg_uhc_ppmc'])
+        uhc_alarm = self.getval('uhc_alarm')
+        self.uhc_alarm_line.set_ydata([uhc_alarm, uhc_alarm])
+        self.uhc_ax.set_ylim(
+            0, max(100, uhc_alarm * 1.2, max(uhc_values, default=0) * 1.2)
+        )
         self.fg_canvas.draw_idle()
 
     def update_time_box(self, state):
@@ -1735,7 +2089,7 @@ def main():
         w.raise_()
         w.activateWindow()
 
-    QTimer.singleShot(2000, reveal_dashboard)
+    QTimer.singleShot(3000, reveal_dashboard)
     sys.exit(app.exec_())
 
 
