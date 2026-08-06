@@ -109,13 +109,10 @@ The P-v-T Demonstrator uses
 > Research, 53*(6), 2498–2508.
 > [https://doi.org/10.1021/ie4033999](https://doi.org/10.1021/ie4033999)
 
-The boiler-furnace simulator's water-and-steam property approximations are
-informed by the
-[IAPWS Industrial Formulation 1997](https://www.iapws.org/relguide/IF97-Rev.pdf)
-(IAPWS-IF97), published by the International Association for the Properties of
-Water and Steam. The simulator uses simplified educational approximations; it
-is not a complete, validated, or standards-conforming implementation of
-IAPWS-IF97.
+The boiler-furnace simulator evaluates water-and-steam properties using
+CoolProp's IAPWS-IF97 backend. Its surrounding boiler, combustion,
+heat-transfer, emissions, and control models are simplified educational models
+and are not suitable for design or safety calculations.
 
 See [scientific attributions](ATTRIBUTIONS.md) for further details.
 
