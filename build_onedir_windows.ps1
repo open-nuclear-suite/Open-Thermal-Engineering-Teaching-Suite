@@ -1,8 +1,10 @@
+param([string]$Version = "1.2.0")
+
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $python = Join-Path $projectRoot ".build-venv\Scripts\python.exe"
-$packageName = "Open-Thermal-Engineering-Teaching-Suite-1.0.0-Windows-x64-onedir"
+$packageName = "Open-Thermal-Engineering-Teaching-Suite-$Version-Windows-x64-onedir"
 $releaseRoot = Join-Path $projectRoot "release"
 $releaseDir = Join-Path $releaseRoot $packageName
 $zipPath = Join-Path $releaseRoot "$packageName.zip"
@@ -38,6 +40,7 @@ $commonArgs = @(
 
 & $python -m PyInstaller @commonArgs `
     --name "Boiler-Furnace-Simulator" `
+    --collect-all CoolProp `
     "$projectRoot\boiler_furnace_simulator\boiler_furnace_simulator.py"
 
 Copy-Item -LiteralPath "$projectRoot\ONEDIR-README.TXT" `

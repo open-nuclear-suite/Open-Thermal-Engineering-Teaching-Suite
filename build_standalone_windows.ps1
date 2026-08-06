@@ -1,8 +1,12 @@
+param([string]$Version = "1.2.0")
+
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $python = Join-Path $projectRoot ".build-venv\Scripts\python.exe"
-$releaseDir = Join-Path $projectRoot "release\Open-Thermal-Engineering-Teaching-Suite-1.0.0-Windows"
+$packageName = "Open-Thermal-Engineering-Teaching-Suite-$Version-Windows-x64"
+$releaseDir = Join-Path (Join-Path $projectRoot "release") $packageName
+$zipPath = Join-Path (Join-Path $projectRoot "release") "$packageName.zip"
 $workDir = Join-Path $projectRoot "build"
 $specDir = Join-Path $projectRoot "build-specs"
 
@@ -34,6 +38,7 @@ $commonArgs = @(
 
 & $python -m PyInstaller @commonArgs `
     --name "Boiler-Furnace-Simulator" `
+    --collect-all CoolProp `
     "$projectRoot\boiler_furnace_simulator\boiler_furnace_simulator.py"
 
 Copy-Item -LiteralPath "$projectRoot\WINDOWS-README.TXT" `
@@ -48,5 +53,8 @@ Get-FileHash -Algorithm SHA256 `
     ForEach-Object { "$($_.Hash)  $(Split-Path -Leaf $_.Path)" } |
     Set-Content -Encoding ascii (Join-Path $releaseDir "SHA256SUMS.txt")
 
+Compress-Archive -LiteralPath $releaseDir -DestinationPath $zipPath `
+    -CompressionLevel Optimal -Force
+
 Write-Host "Standalone release created at:"
-Write-Host $releaseDir
+Write-Host $zipPath

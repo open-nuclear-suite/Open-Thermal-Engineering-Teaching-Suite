@@ -38,10 +38,6 @@
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\loader\\pyiboot01_bootstrap.py',
    'PYSOURCE'),
-  ('pyi_rth_inspect',
-   'C:\\Users\\Mohsin\\Documents\\Thermal '
-   'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
-   'PYSOURCE'),
   ('pyi_rth_pkgutil',
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgutil.py',
@@ -50,13 +46,17 @@
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_multiprocessing.py',
    'PYSOURCE'),
-  ('pyi_rth_pyqt5',
+  ('pyi_rth_inspect',
    'C:\\Users\\Mohsin\\Documents\\Thermal '
-   'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pyqt5.py',
+   'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
    'PYSOURCE'),
   ('pyi_rth_mplconfig',
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_mplconfig.py',
+   'PYSOURCE'),
+  ('pyi_rth_pyqt5',
+   'C:\\Users\\Mohsin\\Documents\\Thermal '
+   'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pyqt5.py',
    'PYSOURCE'),
   ('boiler_furnace_simulator',
    'C:\\Users\\Mohsin\\Documents\\Thermal '
