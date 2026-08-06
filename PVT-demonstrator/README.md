@@ -33,3 +33,12 @@ The previously delivered native source is preserved unchanged as
 
 On first use, run `setup_windows.bat` from the repository root. The included
 `Install and run.docx` provides additional Windows setup instructions.
+
+## Solid + fluid teaching edition
+
+Run `run_pvt_solid_demonstrator.bat` for a separate edition that extends the
+temperature range below the triple point and displays an approximate solid
+surface and fusion boundary. CoolProp remains the source of fluid and
+triple-point properties. Since CoolProp does not provide a general solid
+equation of state for these fluids, the solid properties are clearly labeled
+engineering approximations intended for qualitative teaching only.

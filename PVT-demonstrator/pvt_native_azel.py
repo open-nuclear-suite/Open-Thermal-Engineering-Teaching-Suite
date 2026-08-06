@@ -8,7 +8,9 @@ Run: python pvt_native_app.py
 """
 from __future__ import annotations
 
+import sys
 import tkinter as tk
+import webbrowser
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -23,7 +25,29 @@ from PIL import Image, ImageTk
 
 
 ISOTHERM_COLOR = "#174EA6"
-ASSET_DIR = Path(__file__).resolve().parent.parent
+ABOUT_TEXT = """We would be delighted to hear from educators, students, researchers, and other users of this software.
+
+Please consider sending us a postcard or a short thank-you email describing:
+
+• where you are using the software;
+• how it is being used, such as for teaching, laboratory exercises, demonstrations, or self-study; and
+• any comments or experiences you would like to share.
+
+Postcards may be sent to:
+
+Dean
+Faculty of Mechanical Engineering
+Universiti Teknologi Malaysia
+81310 UTM Skudai
+Johor
+Malaysia
+
+Email: mech@utm.my
+
+Please mention that the software was developed by the Sustainable Energy & Reacting Flow Research Group, Universiti Teknologi Malaysia.
+
+Your message will help us understand the educational reach of the software and encourage its continued development. Thank you for using our software!"""
+ASSET_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 FKM_LOGO_PATH = ASSET_DIR / "utm.fkm.logo.png"
 HIREF_LOGO_PATH = ASSET_DIR / "hiref.logo.png"
 mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
@@ -228,6 +252,13 @@ class App(tk.Tk):
                 header, text="HiREF", background="#0e1013",
                 foreground="white", font=("", 16, "bold"),
             ).pack(side="left", padx=(10, 0))
+        tk.Button(
+            header, text="About", command=self.show_about,
+            background="#7d1238", foreground="white",
+            activebackground="#98204b", activeforeground="white",
+            relief="flat", cursor="hand2", font=("", 10, "bold"),
+            padx=16, pady=7,
+        ).pack(side="right", padx=(14, 0))
         tk.Label(
             header, text="P-v-T Surface Slicing Demonstrator",
             background="#0e1013", foreground="#f3f5f7",
@@ -301,6 +332,43 @@ class App(tk.Tk):
         self._camera = (25, -55, 0)
         self.configure_ranges()
         self.after(50, self.draw)
+
+    def show_about(self):
+        dialog = tk.Toplevel(self)
+        dialog.title("About")
+        dialog.geometry("660x620")
+        dialog.minsize(520, 480)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        body = ttk.Frame(dialog, padding=20)
+        body.pack(expand=True, fill="both")
+        ttk.Label(
+            body, text="Let Us Know Where This Software Is Used",
+            font=("", 16, "bold"), anchor="center",
+        ).pack(fill="x", pady=(0, 14))
+        message = tk.Text(
+            body, wrap="word", relief="flat", background=dialog.cget("background"),
+            padx=4, pady=4, font=("", 10), cursor="arrow",
+        )
+        message.pack(expand=True, fill="both")
+        message.insert("1.0", ABOUT_TEXT)
+        email_start = message.search("mech@utm.my", "1.0")
+        if email_start:
+            email_end = f"{email_start}+{len('mech@utm.my')}c"
+            message.tag_add("email", email_start, email_end)
+            message.tag_config("email", foreground="#174EA6", underline=True)
+            message.tag_bind(
+                "email", "<Button-1>",
+                lambda _event: webbrowser.open("mailto:mech@utm.my"),
+            )
+            message.tag_bind("email", "<Enter>", lambda _event: message.config(cursor="hand2"))
+            message.tag_bind("email", "<Leave>", lambda _event: message.config(cursor="arrow"))
+        message.config(state="disabled")
+        ttk.Button(body, text="Close", command=dialog.destroy).pack(
+            anchor="e", pady=(14, 0)
+        )
+        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
 
     def configure_ranges(self):
         f = FLUIDS[self.fluid.get()]
