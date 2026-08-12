@@ -62,6 +62,10 @@
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\loader\\pyiboot01_bootstrap.py',
    'PYSOURCE'),
+  ('pyi_rth_inspect',
+   'C:\\Users\\Mohsin\\Documents\\Thermal '
+   'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
+   'PYSOURCE'),
   ('pyi_rth_pkgutil',
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgutil.py',
@@ -69,10 +73,6 @@
   ('pyi_rth_multiprocessing',
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_multiprocessing.py',
-   'PYSOURCE'),
-  ('pyi_rth_inspect',
-   'C:\\Users\\Mohsin\\Documents\\Thermal '
-   'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
    'PYSOURCE'),
   ('pyi_rth_mplconfig',
    'C:\\Users\\Mohsin\\Documents\\Thermal '
@@ -89,7 +89,7 @@
  [],
  False,
  False,
- 1786007468,
+ 1786535002,
  [('runw.exe',
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',

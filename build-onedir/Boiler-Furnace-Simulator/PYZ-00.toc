@@ -1919,14 +1919,6 @@
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\matplotlib\\backends\\backend_qtagg.py',
    'PYMODULE'),
-  ('matplotlib.backends.backend_webagg',
-   'C:\\Users\\Mohsin\\Documents\\Thermal '
-   'Engineering\\.build-venv\\Lib\\site-packages\\matplotlib\\backends\\backend_webagg.py',
-   'PYMODULE'),
-  ('matplotlib.backends.backend_webagg_core',
-   'C:\\Users\\Mohsin\\Documents\\Thermal '
-   'Engineering\\.build-venv\\Lib\\site-packages\\matplotlib\\backends\\backend_webagg_core.py',
-   'PYMODULE'),
   ('matplotlib.backends.backend_wx',
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\matplotlib\\backends\\backend_wx.py',

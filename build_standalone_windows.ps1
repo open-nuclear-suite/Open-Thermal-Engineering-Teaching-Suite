@@ -27,19 +27,26 @@ $commonArgs = @(
     "--distpath", $releaseDir,
     "--workpath", $workDir,
     "--specpath", $specDir,
+    "--additional-hooks-dir", (Join-Path $projectRoot "build-hooks"),
     "--add-data", "$projectRoot\utm.fkm.logo.png;.",
     "--add-data", "$projectRoot\hiref.logo.png;."
 )
 
 & $python -m PyInstaller @commonArgs `
     --name "PVT-Demonstrator" `
-    --collect-all CoolProp `
     "$projectRoot\PVT-demonstrator\pvt_native_azel.py"
 
 & $python -m PyInstaller @commonArgs `
     --name "Boiler-Furnace-Simulator" `
-    --collect-all CoolProp `
     "$projectRoot\boiler_furnace_simulator\boiler_furnace_simulator.py"
+
+$boilerExe = Join-Path $releaseDir "Boiler-Furnace-Simulator.exe"
+$archiveViewer = Join-Path `
+    (Split-Path -Parent $python) "pyi-archive_viewer.exe"
+$archiveEntries = & $archiveViewer -l $boilerExe
+if (-not ($archiveEntries -match "coolprop\.libs.*\.dll")) {
+    throw "CoolProp runtime DLLs are missing from the standalone package."
+}
 
 Copy-Item -LiteralPath "$projectRoot\WINDOWS-README.TXT" `
     -Destination (Join-Path $releaseDir "README.TXT") -Force

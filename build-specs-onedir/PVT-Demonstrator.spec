@@ -1,20 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_all
-
-datas = [('C:\\Users\\Mohsin\\Documents\\Thermal Engineering\\utm.fkm.logo.png', '.'), ('C:\\Users\\Mohsin\\Documents\\Thermal Engineering\\hiref.logo.png', '.')]
-binaries = []
-hiddenimports = []
-tmp_ret = collect_all('CoolProp')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['C:\\Users\\Mohsin\\Documents\\Thermal Engineering\\PVT-demonstrator\\pvt_native_azel.py'],
+    ['C:/Users/Mohsin/Documents/Thermal Engineering/PVT-demonstrator/pvt_native_azel.py'],
     pathex=[],
-    binaries=binaries,
-    datas=datas,
-    hiddenimports=hiddenimports,
-    hookspath=[],
+    binaries=[],
+    datas=[('C:/Users/Mohsin/Documents/Thermal Engineering/utm.fkm.logo.png', '.'), ('C:/Users/Mohsin/Documents/Thermal Engineering/hiref.logo.png', '.')],
+    hiddenimports=[],
+    hookspath=['C:/Users/Mohsin/Documents/Thermal Engineering/build-hooks'],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],

@@ -29,19 +29,26 @@ $commonArgs = @(
     "--distpath", $releaseDir,
     "--workpath", $workDir,
     "--specpath", $specDir,
+    "--additional-hooks-dir", (Join-Path $projectRoot "build-hooks"),
     "--add-data", "$projectRoot\utm.fkm.logo.png;.",
     "--add-data", "$projectRoot\hiref.logo.png;."
 )
 
 & $python -m PyInstaller @commonArgs `
     --name "PVT-Demonstrator" `
-    --collect-all CoolProp `
     "$projectRoot\PVT-demonstrator\pvt_native_azel.py"
 
 & $python -m PyInstaller @commonArgs `
     --name "Boiler-Furnace-Simulator" `
-    --collect-all CoolProp `
     "$projectRoot\boiler_furnace_simulator\boiler_furnace_simulator.py"
+
+$coolPropLibDir = Join-Path $releaseDir `
+    "Boiler-Furnace-Simulator\_internal\coolprop.libs"
+$coolPropRuntime = Get-ChildItem -LiteralPath $coolPropLibDir `
+    -Filter "*.dll" -File -ErrorAction SilentlyContinue
+if (-not $coolPropRuntime) {
+    throw "CoolProp runtime DLLs are missing from the onedir package."
+}
 
 Copy-Item -LiteralPath "$projectRoot\ONEDIR-README.TXT" `
     -Destination (Join-Path $releaseDir "README.TXT") -Force

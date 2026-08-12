@@ -3618,6 +3618,10 @@
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\coolprop-8.0.0.dist-info\\licenses\\LICENSE',
    'DATA'),
+  ('coolprop.libs\\msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll',
+   'C:\\Users\\Mohsin\\Documents\\Thermal '
+   'Engineering\\.build-venv\\Lib\\site-packages\\coolprop.libs\\msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll',
+   'BINARY'),
   ('dateutil\\zoneinfo\\dateutil-zoneinfo.tar.gz',
    'C:\\Users\\Mohsin\\Documents\\Thermal '
    'Engineering\\.build-venv\\Lib\\site-packages\\dateutil\\zoneinfo\\dateutil-zoneinfo.tar.gz',
