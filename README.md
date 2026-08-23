@@ -82,12 +82,9 @@ run_boiler_furnace_simulator.bat
 
 ## Author and contact
 
-**Mohsin Mohd Sies**
+**maxisnote20**
 
-- Nuclear Engineering Program
-- Faculty of Chemical and Energy Engineering
-- Universiti Teknologi Malaysia
-- Email: [mohsin.sies@gmail.com](mailto:mohsin.sies@gmail.com)
+- Email: [maxisnote20@gmail.com](mailto:maxisnote20@gmail.com)
 - GitHub: [open-nuclear-suite](https://github.com/open-nuclear-suite)
 
 For academic collaboration, teaching feedback, or questions about the
@@ -118,5 +115,5 @@ See [scientific attributions](ATTRIBUTIONS.md) for further details.
 
 ## License
 
-Copyright (c) 2026 Mohsin Mohd Sies. This project is distributed under the
+Copyright (c) 2026 maxisnote20. This project is distributed under the
 [MIT License](LICENSE).

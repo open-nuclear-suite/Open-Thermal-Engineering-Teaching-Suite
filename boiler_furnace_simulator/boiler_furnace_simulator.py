@@ -24,7 +24,7 @@ from matplotlib.sankey import Sankey
 
 
 PROJECT_NAME = 'Live Boiler/Furnace Transient Simulator'
-AUTHOR_LINE = 'Mohsin Mohd Sies, HiREF, UTM - 2026'
+AUTHOR_LINE = 'maxisnote20 - 2026'
 ABOUT_HTML = '''
 <h2>Let Us Know Where This Software Is Used</h2>
 <p>We would be delighted to hear from educators, students, researchers, and
@@ -36,18 +36,11 @@ other users of this software.</p>
 demonstrations, or self-study; and</li>
 <li>any comments or experiences you would like to share.</li>
 </ul>
-<p><b>Postcards may be sent to:</b></p>
-<p>Dean<br>Faculty of Mechanical Engineering<br>Universiti Teknologi Malaysia<br>
-81310 UTM Skudai<br>Johor<br>Malaysia</p>
-<p><b>Email:</b> <a href="mailto:mech@utm.my">mech@utm.my</a></p>
-<p>Please mention that the software was developed by the
-<b>Sustainable Energy &amp; Reacting Flow Research Group</b>, Universiti
-Teknologi Malaysia.</p>
+<p><b>Email:</b> <a href="mailto:maxisnote20@gmail.com">maxisnote20@gmail.com</a></p>
 <p>Your message will help us understand the educational reach of the software
 and encourage its continued development. Thank you for using our software!</p>
 '''
 ASSET_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-FKM_LOGO_PATH = ASSET_DIR / 'utm.fkm.logo.png'
 HIREF_LOGO_PATH = ASSET_DIR / 'hiref.logo.png'
 
 
@@ -64,7 +57,7 @@ def logo_pixmap(path, max_width, max_height):
 
 
 class StartupSplash(QDialog):
-    """Borderless UTM-branded startup panel displayed before the dashboard."""
+    """Borderless startup panel displayed before the dashboard."""
 
     def __init__(self):
         super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
@@ -77,19 +70,6 @@ class StartupSplash(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(10)
-
-        fkm_logo = QLabel()
-        fkm_logo.setAlignment(Qt.AlignCenter)
-        fkm_pixmap = logo_pixmap(FKM_LOGO_PATH, 850, 140)
-        if fkm_pixmap.isNull():
-            fkm_logo.setText('UTM Faculty of Mechanical Engineering')
-            fkm_logo.setStyleSheet(
-                'background:#7d1238; color:white; padding:10px;'
-                'font-size:24px; font-weight:bold;'
-            )
-        else:
-            fkm_logo.setPixmap(fkm_pixmap)
-        layout.addWidget(fkm_logo)
 
         hiref_logo = QLabel()
         hiref_logo.setAlignment(Qt.AlignCenter)
@@ -687,19 +667,6 @@ class BoilerApp(QMainWindow):
 
         logo_group = QHBoxLayout()
         logo_group.setSpacing(10)
-
-        self.fkm_logo = QLabel()
-        self.fkm_logo.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        dashboard_fkm_logo = logo_pixmap(FKM_LOGO_PATH, 560, 70)
-        if dashboard_fkm_logo.isNull():
-            self.fkm_logo.setText('UTM Faculty of Mechanical Engineering')
-            self.fkm_logo.setStyleSheet(
-                'background:#7d1238; color:white; padding:8px 20px;'
-                'font-size:16px; font-weight:bold;'
-            )
-        else:
-            self.fkm_logo.setPixmap(dashboard_fkm_logo)
-        logo_group.addWidget(self.fkm_logo)
 
         self.hiref_logo = QLabel()
         self.hiref_logo.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)

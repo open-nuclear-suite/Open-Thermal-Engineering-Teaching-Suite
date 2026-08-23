@@ -33,22 +33,10 @@ Please consider sending us a postcard or a short thank-you email describing:
 • how it is being used, such as for teaching, laboratory exercises, demonstrations, or self-study; and
 • any comments or experiences you would like to share.
 
-Postcards may be sent to:
-
-Dean
-Faculty of Mechanical Engineering
-Universiti Teknologi Malaysia
-81310 UTM Skudai
-Johor
-Malaysia
-
-Email: mech@utm.my
-
-Please mention that the software was developed by the Sustainable Energy & Reacting Flow Research Group, Universiti Teknologi Malaysia.
+Email: maxisnote20@gmail.com
 
 Your message will help us understand the educational reach of the software and encourage its continued development. Thank you for using our software!"""
 ASSET_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-FKM_LOGO_PATH = ASSET_DIR / "utm.fkm.logo.png"
 HIREF_LOGO_PATH = ASSET_DIR / "hiref.logo.png"
 mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
@@ -75,16 +63,6 @@ class StartupSplash(tk.Tk):
         panel = tk.Frame(self, background="#15181d", padx=36, pady=28)
         panel.pack()
 
-        self.fkm_image = logo_image(FKM_LOGO_PATH, (850, 140))
-        if self.fkm_image:
-            tk.Label(panel, image=self.fkm_image, background="#15181d").pack()
-        else:
-            tk.Label(
-                panel, text="UTM Faculty of Mechanical Engineering",
-                background="#7d1238", foreground="white",
-                font=("", 24, "bold"), padx=10, pady=10,
-            ).pack(fill="x")
-
         self.hiref_image = logo_image(HIREF_LOGO_PATH, (250, 155))
         if self.hiref_image:
             tk.Label(
@@ -102,7 +80,7 @@ class StartupSplash(tk.Tk):
             font=("", 21, "bold"),
         ).pack(pady=(2, 0))
         tk.Label(
-            panel, text="Mohsin Mohd Sies, HiREF, UTM - 2026",
+            panel, text="maxisnote20 - 2026",
             background="#15181d", foreground="#c7d1db", font=("", 10),
         ).pack(pady=(5, 0))
 
@@ -218,7 +196,7 @@ class App(tk.Tk):
 
         ttk.Label(
             self,
-            text="Mohsin Mohd Sies, Nuclear Engineering, 2026",
+            text="maxisnote20, 2026",
             anchor="center",
             padding=(8, 6),
             font=("", 9),
@@ -231,18 +209,7 @@ class App(tk.Tk):
         header.pack(side="top", fill="x")
         header.configure(padx=14, pady=8)
 
-        self.fkm_logo_image = logo_image(FKM_LOGO_PATH, (560, 70))
         self.hiref_logo_image = logo_image(HIREF_LOGO_PATH, (110, 70))
-        if self.fkm_logo_image:
-            tk.Label(
-                header, image=self.fkm_logo_image, background="#0e1013"
-            ).pack(side="left")
-        else:
-            tk.Label(
-                header, text="UTM Faculty of Mechanical Engineering",
-                background="#7d1238", foreground="white",
-                font=("", 16, "bold"), padx=20, pady=8,
-            ).pack(side="left")
         if self.hiref_logo_image:
             tk.Label(
                 header, image=self.hiref_logo_image, background="#0e1013"
@@ -353,14 +320,14 @@ class App(tk.Tk):
         )
         message.pack(expand=True, fill="both")
         message.insert("1.0", ABOUT_TEXT)
-        email_start = message.search("mech@utm.my", "1.0")
+        email_start = message.search("maxisnote20@gmail.com", "1.0")
         if email_start:
-            email_end = f"{email_start}+{len('mech@utm.my')}c"
+            email_end = f"{email_start}+{len('maxisnote20@gmail.com')}c"
             message.tag_add("email", email_start, email_end)
             message.tag_config("email", foreground="#174EA6", underline=True)
             message.tag_bind(
                 "email", "<Button-1>",
-                lambda _event: webbrowser.open("mailto:mech@utm.my"),
+                lambda _event: webbrowser.open("mailto:maxisnote20@gmail.com"),
             )
             message.tag_bind("email", "<Enter>", lambda _event: message.config(cursor="hand2"))
             message.tag_bind("email", "<Leave>", lambda _event: message.config(cursor="arrow"))

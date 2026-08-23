@@ -54,12 +54,9 @@ SOURCE CODE AND SUPPORT
 https://github.com/open-nuclear-suite/Open-Thermal-Engineering-Teaching-Suite
 
 Author and maintainer:
-Mohsin Mohd Sies
-Nuclear Engineering Program
-Faculty of Chemical and Energy Engineering
-Universiti Teknologi Malaysia
+maxisnote20
 
-Email: mohsin.sies@gmail.com
+Email: maxisnote20@gmail.com
 
 CITATION AND LICENSE
 

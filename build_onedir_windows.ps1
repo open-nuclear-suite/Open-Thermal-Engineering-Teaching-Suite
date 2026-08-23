@@ -30,7 +30,6 @@ $commonArgs = @(
     "--workpath", $workDir,
     "--specpath", $specDir,
     "--additional-hooks-dir", (Join-Path $projectRoot "build-hooks"),
-    "--add-data", "$projectRoot\utm.fkm.logo.png;.",
     "--add-data", "$projectRoot\hiref.logo.png;."
 )
 

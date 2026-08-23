@@ -99,12 +99,9 @@ Source repository:
 https://github.com/open-nuclear-suite/Open-Thermal-Engineering-Teaching-Suite
 
 Author and maintainer:
-Mohsin Mohd Sies
-Nuclear Engineering Program
-Faculty of Chemical and Energy Engineering
-Universiti Teknologi Malaysia
+maxisnote20
 
-Email: mohsin.sies@gmail.com
+Email: maxisnote20@gmail.com
 
 Please use the GitHub repository for source-code access and issue
 reporting. Academic collaboration and teaching feedback are welcome.
@@ -125,7 +122,7 @@ See ATTRIBUTIONS.md in the distribution for complete attribution details.
 LICENSE
 ======================================================================
 
-Copyright (c) 2026 Mohsin Mohd Sies
+Copyright (c) 2026 maxisnote20
 
 This software is distributed under the MIT License. See the included
 LICENSE file for the full license text.

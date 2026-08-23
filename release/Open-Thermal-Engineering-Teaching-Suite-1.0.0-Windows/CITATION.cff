@@ -2,19 +2,19 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata below."
 title: "Open Thermal Engineering Teaching Suite"
 type: software
+version: "1.2.0"
+date-released: "2026-08-06"
 authors:
-  - family-names: "Sies"
-    given-names: "Mohsin Mohd"
-    affiliation: "Nuclear Engineering Program, Faculty of Chemical and Energy Engineering, Universiti Teknologi Malaysia"
-    email: "mohsin.sies@gmail.com"
+  - family-names: "maxisnote20"
+    email: "maxisnote20@gmail.com"
 repository-code: "https://github.com/open-nuclear-suite/Open-Thermal-Engineering-Teaching-Suite"
 license: MIT
 abstract: >-
   Interactive Windows desktop applications for teaching thermodynamic
   properties and boiler-furnace operation. Thermophysical property calculations
-  in the P-v-T Demonstrator use CoolProp. Simplified water-and-steam property
-  approximations in the boiler-furnace simulator are informed by IAPWS-IF97
-  but do not constitute a complete or standards-conforming implementation.
+  in the P-v-T Demonstrator use CoolProp. Water-and-steam properties in the
+  boiler-furnace simulator use CoolProp's IAPWS-IF97 backend within simplified
+  educational combustion, heat-transfer, emissions, and control models.
 keywords:
   - thermal engineering education
   - thermodynamics

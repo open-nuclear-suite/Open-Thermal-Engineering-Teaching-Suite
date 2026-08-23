@@ -126,7 +126,7 @@ class App(tk.Tk):
 
         ttk.Label(
             self,
-            text="Mohsin Mohd Sies, Nuclear Engineering, 2026",
+            text="maxisnote20, 2026",
             anchor="center",
             padding=(8, 6),
             font=("", 9),
@@ -137,7 +137,7 @@ class App(tk.Tk):
         right = ttk.Frame(self)
         right.pack(side="right", expand=True, fill="both")
 
-        logo_path = Path(__file__).with_name("utm_logo.png")
+        logo_path = Path(__file__).with_name("hiref.logo.png")
         self.logo_image = None
         if logo_path.is_file():
             logo = Image.open(logo_path).convert("RGBA")

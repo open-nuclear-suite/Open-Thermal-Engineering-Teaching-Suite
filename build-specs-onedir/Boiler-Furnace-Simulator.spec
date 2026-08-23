@@ -5,7 +5,7 @@ a = Analysis(
     ['C:/Users/Mohsin/Documents/Thermal Engineering/boiler_furnace_simulator/boiler_furnace_simulator.py'],
     pathex=[],
     binaries=[],
-    datas=[('C:/Users/Mohsin/Documents/Thermal Engineering/utm.fkm.logo.png', '.'), ('C:/Users/Mohsin/Documents/Thermal Engineering/hiref.logo.png', '.')],
+    datas=[('C:/Users/Mohsin/Documents/Thermal Engineering/hiref.logo.png', '.')],
     hiddenimports=[],
     hookspath=['C:/Users/Mohsin/Documents/Thermal Engineering/build-hooks'],
     hooksconfig={},

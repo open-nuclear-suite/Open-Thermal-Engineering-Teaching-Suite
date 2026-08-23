@@ -1,6 +1,6 @@
 OPEN THERMAL ENGINEERING TEACHING SUITE
-Version 1.0.0 - Folder-Based Windows Release
-Released: 3 August 2026
+Version 1.2.0 - Folder-Based Windows Release
+Released: 6 August 2026
 
 CONTENTS
 
@@ -54,12 +54,9 @@ SOURCE CODE AND SUPPORT
 https://github.com/open-nuclear-suite/Open-Thermal-Engineering-Teaching-Suite
 
 Author and maintainer:
-Mohsin Mohd Sies
-Nuclear Engineering Program
-Faculty of Chemical and Energy Engineering
-Universiti Teknologi Malaysia
+maxisnote20
 
-Email: mohsin.sies@gmail.com
+Email: maxisnote20@gmail.com
 
 CITATION AND LICENSE
 

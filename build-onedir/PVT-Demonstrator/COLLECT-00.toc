@@ -4683,7 +4683,4 @@
   ('unicodedata.pyd',
    'C:\\Program Files\\Python314\\DLLs\\unicodedata.pyd',
    'EXTENSION'),
-  ('utm.fkm.logo.png',
-   'C:\\Users\\Mohsin\\Documents\\Thermal Engineering\\utm.fkm.logo.png',
-   'DATA'),
   ('zlib1.dll', 'C:\\Program Files\\Python314\\DLLs\\zlib1.dll', 'BINARY')],)
