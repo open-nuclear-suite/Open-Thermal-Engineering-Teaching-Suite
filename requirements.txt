@@ -2,5 +2,5 @@ CoolProp
 matplotlib
 numpy
 Pillow
-PyQt5
-
+PySide6
+pyqtgraph

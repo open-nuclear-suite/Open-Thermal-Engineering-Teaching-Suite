@@ -39,7 +39,11 @@ $commonArgs = @(
 
 & $python -m PyInstaller @commonArgs `
     --name "Boiler-Furnace-Simulator" `
-    "$projectRoot\boiler_furnace_simulator\boiler_furnace_simulator.py"
+    "$projectRoot\boiler_furnace_simulator\main.py"
+
+& $python -m PyInstaller @commonArgs `
+    --name "Boiler-Furnace-Simulator-Suite-Style" `
+    "$projectRoot\boiler_furnace_simulator\suite_main.py"
 
 $coolPropLibDir = Join-Path $releaseDir `
     "Boiler-Furnace-Simulator\_internal\coolprop.libs"
@@ -57,7 +61,8 @@ Copy-Item -LiteralPath "$projectRoot\CITATION.cff" -Destination $releaseDir -For
 
 $executables = @(
     (Join-Path $releaseDir "PVT-Demonstrator\PVT-Demonstrator.exe"),
-    (Join-Path $releaseDir "Boiler-Furnace-Simulator\Boiler-Furnace-Simulator.exe")
+    (Join-Path $releaseDir "Boiler-Furnace-Simulator\Boiler-Furnace-Simulator.exe"),
+    (Join-Path $releaseDir "Boiler-Furnace-Simulator-Suite-Style\Boiler-Furnace-Simulator-Suite-Style.exe")
 )
 
 Get-FileHash -Algorithm SHA256 $executables |
