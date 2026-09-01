@@ -37,7 +37,11 @@ $commonArgs = @(
 
 & $python -m PyInstaller @commonArgs `
     --name "Boiler-Furnace-Simulator" `
-    "$projectRoot\boiler_furnace_simulator\boiler_furnace_simulator.py"
+    "$projectRoot\boiler_furnace_simulator\main.py"
+
+& $python -m PyInstaller @commonArgs `
+    --name "Boiler-Furnace-Simulator-Suite-Style" `
+    "$projectRoot\boiler_furnace_simulator\suite_main.py"
 
 $boilerExe = Join-Path $releaseDir "Boiler-Furnace-Simulator.exe"
 $archiveViewer = Join-Path `
@@ -55,7 +59,8 @@ Copy-Item -LiteralPath "$projectRoot\CITATION.cff" -Destination $releaseDir -For
 
 Get-FileHash -Algorithm SHA256 `
     (Join-Path $releaseDir "PVT-Demonstrator.exe"), `
-    (Join-Path $releaseDir "Boiler-Furnace-Simulator.exe") |
+    (Join-Path $releaseDir "Boiler-Furnace-Simulator.exe"), `
+    (Join-Path $releaseDir "Boiler-Furnace-Simulator-Suite-Style.exe") |
     ForEach-Object { "$($_.Hash)  $(Split-Path -Leaf $_.Path)" } |
     Set-Content -Encoding ascii (Join-Path $releaseDir "SHA256SUMS.txt")
 

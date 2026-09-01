@@ -1,3 +1,4 @@
-matplotlib
-PyQt5
+numpy
+PySide6
+pyqtgraph
 CoolProp
