@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata below."
 title: "Open Thermal Engineering Teaching Suite"
 type: software
-version: "1.2.0"
-date-released: "2026-08-06"
+version: "2.0.0"
+date-released: "2026-09-09"
 authors:
   - family-names: "maxisnote20"
     email: "maxisnote20@gmail.com"

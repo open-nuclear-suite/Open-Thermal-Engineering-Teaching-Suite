@@ -1,6 +1,6 @@
 OPEN THERMAL ENGINEERING TEACHING SUITE
-Version 1.2.0 - Folder-Based Windows Release
-Released: 6 August 2026
+Version 2.0.0 - Folder-Based Windows Release
+Released: 9 September 2026
 
 CONTENTS
 

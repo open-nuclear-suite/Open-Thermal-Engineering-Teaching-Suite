@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['C:/Users/Mohsin/Documents/Thermal Engineering/boiler_furnace_simulator/main.py'],
+    ['C:/Users/Mohsin/Documents/Thermal Engineering/boiler_furnace_simulator/suite_main.py'],
     pathex=[],
     binaries=[],
     datas=[('C:/Users/Mohsin/Documents/Thermal Engineering/hiref.logo.png', '.')],
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Boiler-Furnace-Simulator',
+    name='Boiler-Furnace-Simulator-Suite-Style',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

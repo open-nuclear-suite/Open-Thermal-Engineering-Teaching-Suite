@@ -12,10 +12,12 @@ env/
 .coverage
 htmlcov/
 build/
+build-onedir/
 dist/
+release/
+/*.zip
 *.egg-info/
 .idea/
 .vscode/
 Thumbs.db
 .DS_Store
-
