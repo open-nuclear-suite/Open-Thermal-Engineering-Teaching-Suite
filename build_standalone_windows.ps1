@@ -1,4 +1,8 @@
-param([string]$Version = "2.0.0")
+param(
+    [string]$Version = "2.0.0",
+    [string]$BasePython = "py",
+    [string]$BasePythonVersion = "3.12"
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -11,7 +15,16 @@ $workDir = Join-Path $projectRoot "build"
 $specDir = Join-Path $projectRoot "build-specs"
 
 if (-not (Test-Path -LiteralPath $python)) {
-    py -m venv --system-site-packages (Join-Path $projectRoot ".build-venv")
+    if ($BasePython -eq "py") {
+        & py "-$BasePythonVersion" -m venv (Join-Path $projectRoot ".build-venv")
+    } else {
+        & $BasePython -m venv (Join-Path $projectRoot ".build-venv")
+    }
+}
+
+$buildPythonVersion = & $python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+if ($buildPythonVersion -ne "3.12") {
+    throw "Standalone releases require Python 3.12; found $buildPythonVersion in .build-venv."
 }
 
 & $python -m pip install --upgrade pyinstaller
